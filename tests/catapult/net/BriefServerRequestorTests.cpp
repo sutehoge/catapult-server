@@ -40,7 +40,7 @@ namespace catapult { namespace net {
 
 			static thread::future<ResponseType> CreateFuture(ionet::PacketIo& packetIo, const std::string& host) {
 				// Sanity:
-				EXPECT_EQ("127.0.0.1", host);
+				EXPECT_EQ("::ffff:127.0.0.1", host);
 
 				// Act: create future
 				return api::CreateRemoteChainApiWithoutRegistry(packetIo)->chainInfo();

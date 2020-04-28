@@ -494,7 +494,7 @@ namespace catapult { namespace net {
 		const auto& acceptedSocketInfo = *pAcceptedSocketInfo;
 		EXPECT_TRUE(!!acceptedSocketInfo);
 		EXPECT_TRUE(!!acceptedSocketInfo.socket());
-		EXPECT_EQ("127.0.0.1", acceptedSocketInfo.host());
+		EXPECT_EQ("::ffff:127.0.0.1", acceptedSocketInfo.host());
 		EXPECT_EQ(publicKey, acceptedSocketInfo.publicKey());
 	}
 

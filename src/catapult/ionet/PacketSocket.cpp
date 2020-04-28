@@ -650,6 +650,13 @@ namespace catapult { namespace ionet {
 	// region Accept
 
 	namespace {
+		std::string EndpointToHostString(const boost::asio::ip::tcp::endpoint& endpoint) {
+			// always use mapped ipv4 addresses
+			return boost::asio::ip::tcp::v4() == endpoint.protocol()
+					? boost::asio::ip::address_v6::v4_mapped(endpoint.address().to_v4()).to_string()
+					: endpoint.address().to_string();
+		}
+
 		class AcceptHandler : public std::enable_shared_from_this<AcceptHandler> {
 		public:
 			AcceptHandler(
@@ -685,7 +692,7 @@ namespace catapult { namespace ionet {
 					return m_accept(PacketSocketInfo());
 				}
 
-				m_host = asioEndpoint.address().to_string();
+				m_host = EndpointToHostString(asioEndpoint);
 				m_pSocket = std::make_shared<StrandedPacketSocket>(
 						std::make_shared<SocketGuard>(std::move(socket), m_ioContext, m_options.SslOptions.ContextSupplier()),
 						m_options);
@@ -832,7 +839,9 @@ namespace catapult { namespace ionet {
 				if (ConnectResult::Connected == callbackResult) {
 					m_pSocket->setOptions();
 					m_pSocket->markOpen();
-					m_callback(callbackResult, PacketSocketInfo(m_endpoint.address().to_string(), m_pSocket->publicKey(), m_pSocket));
+
+					auto host = EndpointToHostString(m_endpoint);
+					m_callback(callbackResult, PacketSocketInfo(host, m_pSocket->publicKey(), m_pSocket));
 				} else {
 					m_callback(callbackResult, PacketSocketInfo());
 				}

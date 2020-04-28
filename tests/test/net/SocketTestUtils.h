@@ -91,8 +91,14 @@ namespace catapult { namespace test {
 	/// Creates a local host endpoint with a default port.
 	boost::asio::ip::tcp::endpoint CreateLocalHostEndpoint();
 
+	/// Creates a local host IPv6 endpoint with a default port.
+	boost::asio::ip::tcp::endpoint CreateLocalHostEndpointIPv6();
+
 	/// Creates a local host endpoint with the specified \a port.
 	boost::asio::ip::tcp::endpoint CreateLocalHostEndpoint(unsigned short port);
+
+	/// Creates a local host IPv6 endpoint with the specified \a port.
+	boost::asio::ip::tcp::endpoint CreateLocalHostEndpointIPv6(unsigned short port);
 
 	/// Creates a default PacketSocketSslOptions.
 	ionet::PacketSocketSslOptions CreatePacketSocketSslOptions();
@@ -115,6 +121,10 @@ namespace catapult { namespace test {
 	/// Creates an implicitly closed local host acceptor around \a service.
 	/// \note This acceptor can only be used in tests where it is implicitly closed by stopping \a ioContext.
 	std::shared_ptr<boost::asio::ip::tcp::acceptor> CreateImplicitlyClosedLocalHostAcceptor(boost::asio::io_context& ioContext);
+
+	/// Creates an implicitly closed IPv6 local host acceptor around \a service.
+	/// \note This acceptor can only be used in tests where it is implicitly closed by stopping \a ioContext.
+	std::shared_ptr<boost::asio::ip::tcp::acceptor> CreateImplicitlyClosedLocalHostAcceptorIPv6(boost::asio::io_context& ioContext);
 
 	// endregion
 

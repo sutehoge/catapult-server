@@ -240,7 +240,7 @@ namespace catapult { namespace nodediscovery {
 
 		const auto& subscriberNode = subscriber.nodeParams().params()[0].NodeCopy;
 		EXPECT_EQ(pullPingServer.caPublicKey(), subscriberNode.identity().PublicKey);
-		EXPECT_EQ("127.0.0.1", subscriberNode.identity().Host);
+		EXPECT_EQ("::ffff:127.0.0.1", subscriberNode.identity().Host);
 		EXPECT_EQ("127.0.0.1", subscriberNode.endpoint().Host);
 		EXPECT_EQ("the Legend", subscriberNode.metadata().Name);
 
@@ -449,7 +449,7 @@ namespace catapult { namespace nodediscovery {
 			// Assert: subscriber was called and the name from the response node (the Legend) was used
 			const auto& subscriberNode = subscriber.nodeParams().params()[0].NodeCopy;
 			EXPECT_EQ(partnerKey, subscriberNode.identity().PublicKey);
-			EXPECT_EQ("127.0.0.1", subscriberNode.identity().Host);
+			EXPECT_EQ("::ffff:127.0.0.1", subscriberNode.identity().Host);
 			EXPECT_EQ("the Legend", subscriberNode.metadata().Name);
 		});
 	}

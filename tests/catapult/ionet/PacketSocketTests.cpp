@@ -841,7 +841,37 @@ namespace catapult { namespace ionet {
 
 		// Assert: loopback address is used in tests
 		EXPECT_TRUE(!!socketInfo);
-		EXPECT_EQ("127.0.0.1", socketInfo.host());
+		EXPECT_EQ("::ffff:127.0.0.1", socketInfo.host());
+		EXPECT_EQ(publicKey, socketInfo.publicKey());
+		EXPECT_TRUE(!!socketInfo.socket());
+
+		EXPECT_TRUE(stats.IsOpen);
+		EXPECT_EQ(0u, stats.NumUnprocessedBytes);
+	}
+
+	TEST(TEST_CLASS, AcceptReturnsOpenSocketOnSuccess_IPv6) {
+		// Arrange:
+		auto publicKey = test::GenerateRandomByteArray<Key>();
+		auto pPool = test::CreateStartedIoThreadPool();
+		auto& ioContext = pPool->ioContext();
+		auto pAcceptor = test::CreateImplicitlyClosedLocalHostAcceptorIPv6(ioContext);
+
+		// Act: "server" - accepts a connection
+		//      "client" - connects to the server
+		PacketSocket::Stats stats;
+		PacketSocketInfo socketInfo;
+		boost::asio::post(ioContext, [&ioContext, &acceptor = *pAcceptor, publicKey, &stats, &socketInfo]() {
+			Accept(ioContext, acceptor, test::CreatePacketSocketOptions(publicKey), [&stats, &socketInfo](const auto& acceptedSocketInfo) {
+				socketInfo = acceptedSocketInfo;
+				socketInfo.socket()->stats([&stats](const auto& socketStats) { stats = socketStats; });
+			});
+		});
+		auto pClientSocket = test::AddClientConnectionTask(ioContext);
+		pPool->join();
+
+		// Assert: loopback address is used in tests
+		EXPECT_TRUE(!!socketInfo);
+		EXPECT_EQ("::ffff:127.0.0.1", socketInfo.host());
 		EXPECT_EQ(publicKey, socketInfo.publicKey());
 		EXPECT_TRUE(!!socketInfo.socket());
 
@@ -1103,7 +1133,26 @@ namespace catapult { namespace ionet {
 
 		// Assert:
 		EXPECT_EQ(ConnectResult::Connected, result.Result);
-		EXPECT_EQ("127.0.0.1", result.Host);
+		EXPECT_EQ("::ffff:127.0.0.1", result.Host);
+		EXPECT_EQ(publicKey, result.PublicKey);
+		EXPECT_TRUE(result.IsSocketValid);
+	}
+
+	TEST(TEST_CLASS, ConnectionSucceedsWhenServerAcceptsConnection_IPv6) {
+		// Arrange: set up a server acceptor thread (this is required to perform ssl handshake)
+		auto publicKey = test::GenerateRandomByteArray<Key>();
+		boost::asio::io_context ioContext;
+		test::SpawnPacketServerWork(ioContext, [](const auto&) {});
+
+		auto endpoint = test::CreateLocalHostNodeEndpoint();
+		endpoint.Host = "::ffff:127.0.0.1";
+
+		// Act: attempt to connect to a running server
+		auto result = ConnectAndWait(ioContext, endpoint, publicKey);
+
+		// Assert:
+		EXPECT_EQ(ConnectResult::Connected, result.Result);
+		EXPECT_EQ("::ffff:127.0.0.1", result.Host);
 		EXPECT_EQ(publicKey, result.PublicKey);
 		EXPECT_TRUE(result.IsSocketValid);
 	}

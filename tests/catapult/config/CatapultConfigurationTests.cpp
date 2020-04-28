@@ -144,7 +144,7 @@ namespace catapult { namespace config {
 			EXPECT_EQ(5'000u, config.MaxTrackedNodes);
 
 			EXPECT_TRUE(config.TrustedHosts.empty());
-			EXPECT_EQ(std::unordered_set<std::string>({ "127.0.0.1" }), config.LocalNetworks);
+			EXPECT_EQ(std::unordered_set<std::string>({ "::ffff:127.0.0.1" }), config.LocalNetworks);
 
 			EXPECT_EQ("", config.Local.Host);
 			EXPECT_EQ("", config.Local.FriendlyName);
@@ -346,7 +346,7 @@ namespace catapult { namespace config {
 		const auto& identity = node.identity();
 		EXPECT_EQ(expectedPublicKey, identity.PublicKey);
 		EXPECT_NE(Key(), identity.PublicKey);
-		EXPECT_EQ("127.0.0.1", identity.Host);
+		EXPECT_EQ("::ffff:127.0.0.1", identity.Host);
 
 		const auto& endpoint = node.endpoint();
 		EXPECT_EQ("alice.com", endpoint.Host);

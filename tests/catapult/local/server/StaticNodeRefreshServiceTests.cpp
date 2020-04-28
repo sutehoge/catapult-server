@@ -191,15 +191,19 @@ namespace catapult { namespace local {
 
 				// - check that hosts are set correctly (identity host is resolved but endpoint host is not)
 				nodesView.forEach([&endpointHost](const auto& node, const auto&) {
-					EXPECT_EQ("127.0.0.1", node.identity().Host);
+					EXPECT_EQ("::ffff:127.0.0.1", node.identity().Host);
 					EXPECT_EQ(endpointHost, node.endpoint().Host);
 				});
 			});
 		}
 	}
 
-	TEST(TEST_CLASS, RefreshSucceedsWhenThereAreMultipleResolvableStaticNodes_LoopbackAddress) {
+	TEST(TEST_CLASS, RefreshSucceedsWhenThereAreMultipleResolvableStaticNodes_LoopbackAddressIPv4) {
 		AssertRefreshSucceedsWhenThereAreMultipleResolvableStaticNodes("127.0.0.1");
+	}
+
+	TEST(TEST_CLASS, RefreshSucceedsWhenThereAreMultipleResolvableStaticNodes_LoopbackAddressIPv6) {
+		AssertRefreshSucceedsWhenThereAreMultipleResolvableStaticNodes("::ffff:127.0.0.1");
 	}
 
 #if !defined(_WIN32) && !defined(__APPLE__)
@@ -243,7 +247,7 @@ namespace catapult { namespace local {
 
 			// - check that hosts are set correctly
 			nodesView.forEach([](const auto& node, const auto&) {
-				EXPECT_EQ("127.0.0.1", node.identity().Host);
+				EXPECT_EQ("::ffff:127.0.0.1", node.identity().Host);
 				EXPECT_EQ("127.0.0.1", node.endpoint().Host);
 			});
 		});

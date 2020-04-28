@@ -366,6 +366,22 @@ namespace catapult { namespace extensions {
 		AssertAcceptedConnection(context, key, *pServer);
 	}
 
+	TEST(TEST_CLASS, BootServer_ConnectionAcceptedWhenAcceptSucceedsWithNotifySuccessIPv6) {
+		// Arrange: boot the server
+		auto key = test::GenerateRandomByteArray<Key>();
+		BootServerContext context(net::PeerConnectCode::Accepted, key);
+		auto pServer = context.boot();
+
+		// Act: connect to the server
+		auto pClientThreadPool = test::CreateStartedIoThreadPool(1);
+		auto pClientSocket = test::CreateClientSocket(pClientThreadPool->ioContext());
+		pClientSocket->connect(test::ClientSocket::ConnectOptions::IPv6);
+		WAIT_FOR_ONE_EXPR(context.acceptor().numAccepts());
+
+		// Assert:
+		AssertAcceptedConnection(context, key, *pServer);
+	}
+
 	TEST(TEST_CLASS, BootServer_ConnectionRejectedWhenAcceptSucceedsWithNotifyFailure) {
 		// Arrange: boot the server
 		auto key = test::GenerateRandomByteArray<Key>();

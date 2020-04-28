@@ -250,7 +250,7 @@ namespace catapult { namespace net {
 			EXPECT_EQ(PeerConnectCode::Accepted, connectCode);
 			EXPECT_EQ(1u, context.pConnector->numActiveConnections());
 			EXPECT_TRUE(!!clientSocketInfo.socket());
-			EXPECT_EQ("127.0.0.1", clientSocketInfo.host());
+			EXPECT_EQ("::ffff:127.0.0.1", clientSocketInfo.host());
 			EXPECT_EQ(context.ServerPublicKey, clientSocketInfo.publicKey());
 		});
 	}
@@ -284,7 +284,7 @@ namespace catapult { namespace net {
 		for (auto i = 0u; i < Num_Connections; ++i) {
 			EXPECT_EQ(PeerConnectCode::Accepted, state.Codes[i]);
 			EXPECT_TRUE(!!state.ClientSocketInfos[i].socket());
-			EXPECT_EQ("127.0.0.1", state.ClientSocketInfos[i].host());
+			EXPECT_EQ("::ffff:127.0.0.1", state.ClientSocketInfos[i].host());
 			EXPECT_EQ(context.ServerPublicKey, state.ClientSocketInfos[i].publicKey());
 		}
 

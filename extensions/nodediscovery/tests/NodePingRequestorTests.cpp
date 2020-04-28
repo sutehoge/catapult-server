@@ -100,7 +100,7 @@ namespace catapult { namespace nodediscovery {
 			EXPECT_EQ(net::NodeRequestResult::Success, result);
 
 			EXPECT_EQ(expectedIdentityKey, responseNode.identity().PublicKey);
-			EXPECT_EQ("127.0.0.1", responseNode.identity().Host);
+			EXPECT_EQ("::ffff:127.0.0.1", responseNode.identity().Host);
 			EXPECT_EQ("127.0.0.1", responseNode.endpoint().Host);
 			EXPECT_EQ(ionet::NodeVersion(1234), responseNode.metadata().Version);
 			EXPECT_EQ("a", responseNode.metadata().Name);

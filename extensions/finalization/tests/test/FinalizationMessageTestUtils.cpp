@@ -43,7 +43,8 @@ namespace catapult { namespace test {
 		pMessage->HashesCount = 1;
 		pMessage->StepIdentifier = stepIdentifier;
 
-		FillWithRandomData(pMessage->Signature.Root.ParentPublicKey);
+		FillWithRandomData(pMessage->Signature);
+		FillWithRandomData(pMessage->SortitionHashProof);
 		*pMessage->HashesPtr() = hash;
 		return pMessage;
 	}

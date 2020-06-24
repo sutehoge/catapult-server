@@ -18,11 +18,11 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "finalization/src/MultiStepFinalizationMessageAggregator.h"
-#include "finalization/src/FinalizationMessage.h"
+#include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
+#include "finalization/src/model/FinalizationMessage.h"
 #include "tests/TestHarness.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace chain {
 
 #define TEST_CLASS MultiStepFinalizationMessageAggregatorTests
 
@@ -31,9 +31,9 @@ namespace catapult { namespace finalization {
 
 		// region MockFinalizationMessageAggregator
 
-		class MockFinalizationMessageAggregator : public FinalizationMessageAggregator {
+		class MockFinalizationMessageAggregator : public SingleStepFinalizationMessageAggregator {
 		public:
-			explicit MockFinalizationMessageAggregator(const FinalizationConfiguration& config)
+			explicit MockFinalizationMessageAggregator(const finalization::FinalizationConfiguration& config)
 					: m_config(config)
 					, m_hasConsensus(false)
 					, m_numVotes(0)
@@ -54,7 +54,7 @@ namespace catapult { namespace finalization {
 			}
 
 		public:
-			void add(const FinalizationMessage& message, uint64_t numVotes) override {
+			void add(const model::FinalizationMessage& message, uint64_t numVotes) override {
 				m_breadcrumbs.emplace_back(message.Signature.Root.ParentPublicKey, numVotes);
 
 				m_numVotes += numVotes;
@@ -65,7 +65,7 @@ namespace catapult { namespace finalization {
 			}
 
 		private:
-			FinalizationConfiguration m_config;
+			finalization::FinalizationConfiguration m_config;
 			bool m_hasConsensus;
 			Hash256 m_consensusHash;
 
@@ -80,7 +80,7 @@ namespace catapult { namespace finalization {
 		class TestContext {
 		public:
 			TestContext(uint32_t threshold, uint32_t size) {
-				auto config = FinalizationConfiguration::Uninitialized();
+				auto config = finalization::FinalizationConfiguration::Uninitialized();
 				config.Size = size;
 				config.Threshold = threshold;
 
@@ -129,9 +129,9 @@ namespace catapult { namespace finalization {
 
 		// region test utils
 
-		std::unique_ptr<FinalizationMessage> CreateMessage(const crypto::StepIdentifier& stepIdentifier, const Hash256& hash) {
-			uint32_t messageSize = sizeof(FinalizationMessage) + Hash256::Size;
-			auto pMessage = utils::MakeUniqueWithSize<FinalizationMessage>(messageSize);
+		std::unique_ptr<model::FinalizationMessage> CreateMessage(const crypto::StepIdentifier& stepIdentifier, const Hash256& hash) {
+			uint32_t messageSize = sizeof(model::FinalizationMessage) + Hash256::Size;
+			auto pMessage = utils::MakeUniqueWithSize<model::FinalizationMessage>(messageSize);
 			pMessage->Size = messageSize;
 			pMessage->HashesCount = 1;
 			pMessage->StepIdentifier = stepIdentifier;

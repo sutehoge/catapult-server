@@ -19,14 +19,14 @@
 **/
 
 #pragma once
-#include "FinalizationConfiguration.h"
+#include "finalization/src/FinalizationConfiguration.h"
 #include "catapult/utils/Hashers.h"
 #include "catapult/types.h"
 #include <unordered_map>
 
 namespace catapult { namespace cache { class AccountStateCacheView; } }
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace model {
 
 	/// Account data relevant to finalization.
 	struct FinalizationAccountView {
@@ -46,7 +46,7 @@ namespace catapult { namespace finalization {
 				FinalizationPoint point,
 				Height height,
 				const GenerationHash& generationHash,
-				const FinalizationConfiguration& config,
+				const finalization::FinalizationConfiguration& config,
 				const cache::AccountStateCacheView& accountStateCacheView);
 
 	public:
@@ -57,7 +57,7 @@ namespace catapult { namespace finalization {
 		const GenerationHash& generationHash() const;
 
 		/// Gets the finalization configuration.
-		const FinalizationConfiguration& config() const;
+		const finalization::FinalizationConfiguration& config() const;
 
 		/// Gets the total weight of all finalization-eligible accounts.
 		Amount weight() const;
@@ -68,7 +68,7 @@ namespace catapult { namespace finalization {
 	private:
 		Height m_height;
 		GenerationHash m_generationHash;
-		FinalizationConfiguration m_config;
+		finalization::FinalizationConfiguration m_config;
 		Amount m_weight;
 		std::unordered_map<VotingKey, FinalizationAccountView, utils::ArrayHasher<VotingKey>> m_accounts;
 	};

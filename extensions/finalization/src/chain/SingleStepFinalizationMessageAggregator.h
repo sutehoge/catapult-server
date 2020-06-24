@@ -19,19 +19,19 @@
 **/
 
 #pragma once
-#include "FinalizationConfiguration.h"
+#include "finalization/src/FinalizationConfiguration.h"
 #include "catapult/types.h"
 #include <memory>
 
-namespace catapult { namespace finalization { struct FinalizationMessage; } }
+namespace catapult { namespace model { struct FinalizationMessage; } }
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace chain {
 
 	/// Aggregates finalization messages for a single step until consensus is reached.
 	/// \note Messages are assumed to all refer to the same step identifier and be validated by the caller.
-	class FinalizationMessageAggregator {
+	class SingleStepFinalizationMessageAggregator {
 	public:
-		virtual ~FinalizationMessageAggregator() = default;
+		virtual ~SingleStepFinalizationMessageAggregator() = default;
 
 	public:
 		/// Returns \c true if consensus has been reached.
@@ -43,14 +43,15 @@ namespace catapult { namespace finalization {
 	public:
 		/// Adds a finalization \a message to the aggregator that contributes \a numVotes votes.
 		/// \note This function is expected to be called after ProcessMessage.
-		virtual void add(const FinalizationMessage& message, uint64_t numVotes) = 0;
+		virtual void add(const model::FinalizationMessage& message, uint64_t numVotes) = 0;
 	};
 
 	/// Creates a finalization message aggregator that attempts to reach consensus on a single value given \a config.
-	std::unique_ptr<FinalizationMessageAggregator> CreateFinalizationMessageCountVotesAggregator(const FinalizationConfiguration& config);
+	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCountVotesAggregator(
+			const finalization::FinalizationConfiguration& config);
 
 	/// Creates a finalization message aggregator that attempts to reach consensus on block hash given \a config and \a hashes.
-	std::unique_ptr<FinalizationMessageAggregator> CreateFinalizationMessageCommonBlockAggregator(
-			const FinalizationConfiguration& config,
+	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCommonBlockAggregator(
+			const finalization::FinalizationConfiguration& config,
 			const std::vector<Hash256>& hashes);
 }}

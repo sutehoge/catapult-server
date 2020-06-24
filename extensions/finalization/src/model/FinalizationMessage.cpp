@@ -25,7 +25,7 @@
 #include "catapult/crypto_voting/OtsTree.h"
 #include "catapult/utils/MemoryUtils.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace model {
 
 	namespace {
 #pragma pack(push, 1)

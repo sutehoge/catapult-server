@@ -25,11 +25,11 @@
 namespace catapult { namespace handlers {
 
 	namespace {
-		using FinalizationMessage = finalization::FinalizationMessage;
-
 		auto CreatePushMessagesHandler(const MessageRangeHandler& rangeHandler) {
 			return [rangeHandler](const ionet::Packet& packet, const auto& context) {
-				auto range = ionet::ExtractEntitiesFromPacket<FinalizationMessage>(packet, ionet::IsSizeValid<FinalizationMessage>);
+				auto range = ionet::ExtractEntitiesFromPacket<model::FinalizationMessage>(
+						packet,
+						ionet::IsSizeValid<model::FinalizationMessage>);
 				if (range.empty()) {
 					CATAPULT_LOG(warning) << "rejecting empty range: " << packet;
 					return;

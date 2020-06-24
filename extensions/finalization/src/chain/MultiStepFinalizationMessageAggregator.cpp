@@ -19,12 +19,12 @@
 **/
 
 #include "MultiStepFinalizationMessageAggregator.h"
-#include "FinalizationMessage.h"
+#include "finalization/src/model/FinalizationMessage.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace chain {
 
 	MultiStepFinalizationMessageAggregator::MultiStepFinalizationMessageAggregator(
-			const FinalizationConfiguration& config,
+			const finalization::FinalizationConfiguration& config,
 			const AggregatorFactory& aggregatorFactory,
 			const ConsensusSink& consensusSink)
 			: m_config(config)
@@ -36,7 +36,7 @@ namespace catapult { namespace finalization {
 		return m_aggregators.size();
 	}
 
-	void MultiStepFinalizationMessageAggregator::add(const FinalizationMessage& message, uint64_t numVotes) {
+	void MultiStepFinalizationMessageAggregator::add(const model::FinalizationMessage& message, uint64_t numVotes) {
 		if (!canAccept(message.StepIdentifier))
 			return;
 
@@ -58,8 +58,8 @@ namespace catapult { namespace finalization {
 	}
 
 	bool MultiStepFinalizationMessageAggregator::add(
-			FinalizationMessageAggregator& aggregator,
-			const FinalizationMessage& message,
+			SingleStepFinalizationMessageAggregator& aggregator,
+			const model::FinalizationMessage& message,
 			uint64_t numVotes) {
 		aggregator.add(message, numVotes);
 		if (!aggregator.hasConsensus())

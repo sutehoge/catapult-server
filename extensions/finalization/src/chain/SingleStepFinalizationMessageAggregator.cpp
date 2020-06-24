@@ -18,18 +18,18 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "FinalizationMessageAggregator.h"
-#include "FinalizationMessage.h"
+#include "SingleStepFinalizationMessageAggregator.h"
+#include "finalization/src/model/FinalizationMessage.h"
 #include "catapult/utils/ArraySet.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace chain {
 
 	// region BasicFinalizationMessageAggregator
 
 	namespace {
-		class BasicFinalizationMessageAggregator : public FinalizationMessageAggregator {
+		class BasicFinalizationMessageAggregator : public SingleStepFinalizationMessageAggregator {
 		public:
-			explicit BasicFinalizationMessageAggregator(const FinalizationConfiguration& config)
+			explicit BasicFinalizationMessageAggregator(const finalization::FinalizationConfiguration& config)
 					: m_config(config)
 					, m_hasConsensus(false)
 			{}
@@ -44,7 +44,7 @@ namespace catapult { namespace finalization {
 			}
 
 		public:
-			void add(const FinalizationMessage& message, uint64_t numVotes) override final {
+			void add(const model::FinalizationMessage& message, uint64_t numVotes) override final {
 				add(m_config, message.Signature.Root.ParentPublicKey, *message.HashesPtr(), numVotes);
 			}
 
@@ -56,13 +56,13 @@ namespace catapult { namespace finalization {
 
 		private:
 			virtual void add(
-					const FinalizationConfiguration& config,
+					const finalization::FinalizationConfiguration& config,
 					const Key& votingPublicKey,
 					const Hash256& hash,
 					uint64_t numVotes) = 0;
 
 		private:
-			FinalizationConfiguration m_config;
+			finalization::FinalizationConfiguration m_config;
 			bool m_hasConsensus;
 			Hash256 m_consensusHash;
 		};
@@ -75,13 +75,13 @@ namespace catapult { namespace finalization {
 	namespace {
 		class FinalizationMessageCountVotesAggregator : public BasicFinalizationMessageAggregator {
 		public:
-			explicit FinalizationMessageCountVotesAggregator(const FinalizationConfiguration& config)
+			explicit FinalizationMessageCountVotesAggregator(const finalization::FinalizationConfiguration& config)
 					: BasicFinalizationMessageAggregator(config)
 			{}
 
 		public:
 			void add(
-					const FinalizationConfiguration& config,
+					const finalization::FinalizationConfiguration& config,
 					const Key& votingPublicKey,
 					const Hash256& hash,
 					uint64_t numVotes) override {
@@ -101,7 +101,8 @@ namespace catapult { namespace finalization {
 		};
 	}
 
-	std::unique_ptr<FinalizationMessageAggregator> CreateFinalizationMessageCountVotesAggregator(const FinalizationConfiguration& config) {
+	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCountVotesAggregator(
+			const finalization::FinalizationConfiguration& config) {
 		return std::make_unique<FinalizationMessageCountVotesAggregator>(config);
 	}
 
@@ -115,7 +116,9 @@ namespace catapult { namespace finalization {
 			static constexpr auto Not_Found = std::numeric_limits<size_t>::max();
 
 		public:
-			FinalizationMessageCommonBlockAggregator(const FinalizationConfiguration& config, const std::vector<Hash256>& hashes)
+			FinalizationMessageCommonBlockAggregator(
+					const finalization::FinalizationConfiguration& config,
+					const std::vector<Hash256>& hashes)
 					: BasicFinalizationMessageAggregator(config)
 					, m_hashes(hashes)
 					, m_hashVotes(m_hashes.size(), 0)
@@ -124,7 +127,7 @@ namespace catapult { namespace finalization {
 
 		public:
 			void add(
-					const FinalizationConfiguration& config,
+					const finalization::FinalizationConfiguration& config,
 					const Key& votingPublicKey,
 					const Hash256& hash,
 					uint64_t numVotes) override {
@@ -153,7 +156,11 @@ namespace catapult { namespace finalization {
 				return m_hashes.cend() == iter ? Not_Found : static_cast<size_t>(std::distance(m_hashes.cbegin(), iter));
 			}
 
-			void incrementVotes(const FinalizationConfiguration& config, size_t startIndex, size_t endIndex, uint64_t numVotes) {
+			void incrementVotes(
+					const finalization::FinalizationConfiguration& config,
+					size_t startIndex,
+					size_t endIndex,
+					uint64_t numVotes) {
 				// if there is already consensus, only allow new consensus that includes more hashes
 				auto adjustedStartIndex = hasConsensus() ? m_consensusHashIndex + 1 : startIndex;
 				for (auto i = endIndex + 1; i > adjustedStartIndex; --i) {
@@ -181,8 +188,8 @@ namespace catapult { namespace finalization {
 		};
 	}
 
-	std::unique_ptr<FinalizationMessageAggregator> CreateFinalizationMessageCommonBlockAggregator(
-			const FinalizationConfiguration& config,
+	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCommonBlockAggregator(
+			const finalization::FinalizationConfiguration& config,
 			const std::vector<Hash256>& hashes) {
 		return std::make_unique<FinalizationMessageCommonBlockAggregator>(config, hashes);
 	}

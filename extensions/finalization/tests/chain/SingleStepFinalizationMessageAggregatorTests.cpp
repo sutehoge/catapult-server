@@ -18,27 +18,27 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "finalization/src/FinalizationMessageAggregator.h"
-#include "finalization/src/FinalizationMessage.h"
+#include "finalization/src/chain/SingleStepFinalizationMessageAggregator.h"
+#include "finalization/src/model/FinalizationMessage.h"
 #include "tests/TestHarness.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace chain {
 
-#define TEST_CLASS FinalizationMessageAggregatorTests
+#define TEST_CLASS SingleStepFinalizationMessageAggregatorTests
 
 	namespace {
 		// region test utils
 
-		FinalizationConfiguration CreateConfiguration(uint32_t threshold, uint32_t size) {
-			auto config = FinalizationConfiguration::Uninitialized();
+		finalization::FinalizationConfiguration CreateConfiguration(uint32_t threshold, uint32_t size) {
+			auto config = finalization::FinalizationConfiguration::Uninitialized();
 			config.Size = size;
 			config.Threshold = threshold;
 			return config;
 		}
 
-		std::unique_ptr<FinalizationMessage> CreateMessage(const Hash256& hash) {
-			uint32_t messageSize = sizeof(FinalizationMessage) + Hash256::Size;
-			auto pMessage = utils::MakeUniqueWithSize<FinalizationMessage>(messageSize);
+		std::unique_ptr<model::FinalizationMessage> CreateMessage(const Hash256& hash) {
+			uint32_t messageSize = sizeof(model::FinalizationMessage) + Hash256::Size;
+			auto pMessage = utils::MakeUniqueWithSize<model::FinalizationMessage>(messageSize);
 			pMessage->Size = messageSize;
 			pMessage->HashesCount = 1;
 
@@ -47,7 +47,7 @@ namespace catapult { namespace finalization {
 			return pMessage;
 		}
 
-		void AssertNoConsensus(const FinalizationMessageAggregator& aggregator, const std::string& message = "") {
+		void AssertNoConsensus(const SingleStepFinalizationMessageAggregator& aggregator, const std::string& message = "") {
 			EXPECT_FALSE(aggregator.hasConsensus()) << message;
 			EXPECT_EQ(Hash256(), aggregator.consensusHash()) << message;
 		}
@@ -59,7 +59,9 @@ namespace catapult { namespace finalization {
 
 	namespace {
 		struct CountVotesTraits {
-			static auto CreateFinalizationMessageAggregator(const FinalizationConfiguration& config, const std::vector<Hash256>&) {
+			static auto CreateFinalizationMessageAggregator(
+					const finalization::FinalizationConfiguration& config,
+					const std::vector<Hash256>&) {
 				return CreateFinalizationMessageCountVotesAggregator(config);
 			}
 		};

@@ -26,10 +26,10 @@
 
 namespace catapult {
 	namespace crypto { class OtsTree; }
-	namespace finalization { class FinalizationContext; }
+	namespace model { class FinalizationContext; }
 }
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace model {
 
 #pragma pack(push, 1)
 

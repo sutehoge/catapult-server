@@ -21,7 +21,7 @@
 #include "FinalizationContext.h"
 #include "catapult/cache_core/AccountStateCache.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace model {
 
 	namespace {
 		VotingKey Find(const std::vector<model::PinnedVotingKey>& pinnedPublicKeys, FinalizationPoint point) {
@@ -36,7 +36,7 @@ namespace catapult { namespace finalization {
 			FinalizationPoint point,
 			Height height,
 			const GenerationHash& generationHash,
-			const FinalizationConfiguration& config,
+			const finalization::FinalizationConfiguration& config,
 			const cache::AccountStateCacheView& accountStateCacheView)
 			: m_height(height)
 			, m_generationHash(generationHash)
@@ -65,7 +65,7 @@ namespace catapult { namespace finalization {
 		return m_generationHash;
 	}
 
-	const FinalizationConfiguration& FinalizationContext::config() const {
+	const finalization::FinalizationConfiguration& FinalizationContext::config() const {
 		return m_config;
 	}
 

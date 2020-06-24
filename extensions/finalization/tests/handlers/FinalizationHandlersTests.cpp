@@ -27,8 +27,6 @@ namespace catapult { namespace handlers {
 #define TEST_CLASS FinalizationHandlersTests
 
 	namespace {
-		using FinalizationMessage = finalization::FinalizationMessage;
-
 		void SetMessageAt(ionet::ByteBuffer& buffer, size_t offset, size_t size) {
 			auto messageSize = static_cast<uint32_t>(size);
 			auto remainingBufferSize = buffer.size() - offset;
@@ -36,14 +34,14 @@ namespace catapult { namespace handlers {
 			if (messageSize > remainingBufferSize)
 				throw std::runtime_error("cannot fit the data in provided buffer");
 
-			auto& message = reinterpret_cast<FinalizationMessage&>(buffer[offset]);
+			auto& message = reinterpret_cast<model::FinalizationMessage&>(buffer[offset]);
 			message.Size = messageSize;
-			message.HashesCount = static_cast<uint32_t>((size - sizeof(FinalizationMessage)) / Hash256::Size);
+			message.HashesCount = static_cast<uint32_t>((size - sizeof(model::FinalizationMessage)) / Hash256::Size);
 		}
 
 		struct PushMessagesTraits {
 			static constexpr auto Packet_Type = ionet::PacketType::Push_Finalization_Messages;
-			static constexpr auto Data_Size = sizeof(FinalizationMessage);
+			static constexpr auto Data_Size = sizeof(model::FinalizationMessage);
 
 			static constexpr size_t AdditionalPacketSize(size_t numMessages) {
 				return (numMessages * (numMessages + 1) / 2) * Hash256::Size;

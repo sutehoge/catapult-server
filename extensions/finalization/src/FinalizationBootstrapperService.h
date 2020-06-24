@@ -19,7 +19,7 @@
 **/
 
 #pragma once
-#include "FinalizationMessage.h"
+#include "finalization/src/model/FinalizationMessage.h"
 #include "catapult/extensions/BasicServerHooks.h"
 #include "catapult/extensions/ServiceRegistrar.h"
 #include "catapult/handlers/HandlerTypes.h"
@@ -32,7 +32,7 @@ namespace catapult { namespace finalization {
 	class FinalizationServerHooks {
 	public:
 		/// Sets the message range \a consumer.
-		void setMessageRangeConsumer(const handlers::RangeHandler<FinalizationMessage>& consumer) {
+		void setMessageRangeConsumer(const handlers::RangeHandler<model::FinalizationMessage>& consumer) {
 			extensions::SetOnce(m_messageRangeConsumer, consumer);
 		}
 
@@ -43,7 +43,7 @@ namespace catapult { namespace finalization {
 		}
 
 	private:
-		handlers::RangeHandler<FinalizationMessage> m_messageRangeConsumer;
+		handlers::RangeHandler<model::FinalizationMessage> m_messageRangeConsumer;
 	};
 
 	// endregion

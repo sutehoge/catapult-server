@@ -19,14 +19,14 @@
 **/
 
 #pragma once
-#include "finalization/src/FinalizationMessage.h"
+#include "finalization/src/model/FinalizationMessage.h"
 #include "catapult/handlers/HandlerTypes.h"
 #include "catapult/ionet/PacketHandlers.h"
 
 namespace catapult { namespace handlers {
 
 	/// Prototype for a function that processes a range of finalization messages.
-	using MessageRangeHandler = RangeHandler<finalization::FinalizationMessage>;
+	using MessageRangeHandler = RangeHandler<model::FinalizationMessage>;
 
 	/// Registers a push messages handler in \a handlers that forwards messages to \a messageRangeHandler.
 	void RegisterPushMessagesHandler(ionet::ServerPacketHandlers& handlers, const MessageRangeHandler& messageRangeHandler);

@@ -31,13 +31,13 @@ namespace catapult { namespace finalization {
 
 	namespace {
 		struct MessageRangeConsumerTraits {
-			using ParamType = model::AnnotatedEntityRange<FinalizationMessage>;
+			using ParamType = model::AnnotatedEntityRange<model::FinalizationMessage>;
 
 			static auto Get(const FinalizationServerHooks& hooks) {
 				return hooks.messageRangeConsumer();
 			}
 
-			static void Set(FinalizationServerHooks& hooks, const handlers::RangeHandler<FinalizationMessage>& consumer) {
+			static void Set(FinalizationServerHooks& hooks, const handlers::RangeHandler<model::FinalizationMessage>& consumer) {
 				hooks.setMessageRangeConsumer(consumer);
 			}
 		};

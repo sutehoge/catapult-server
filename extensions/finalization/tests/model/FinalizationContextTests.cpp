@@ -18,14 +18,14 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "finalization/src/FinalizationContext.h"
+#include "finalization/src/model/FinalizationContext.h"
 #include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/model/Address.h"
 #include "tests/test/cache/AccountStateCacheTestUtils.h"
 #include "tests/test/core/AddressTestUtils.h"
 #include "tests/TestHarness.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace model {
 
 #define TEST_CLASS FinalizationContextTests
 
@@ -42,8 +42,8 @@ namespace catapult { namespace finalization {
 			return options;
 		}
 
-		FinalizationConfiguration CreateConfigurationWithSize(uint32_t size) {
-			auto config = FinalizationConfiguration::Uninitialized();
+		finalization::FinalizationConfiguration CreateConfigurationWithSize(uint32_t size) {
+			auto config = finalization::FinalizationConfiguration::Uninitialized();
 			config.Size = size;
 			return config;
 		}

@@ -19,23 +19,24 @@
 **/
 
 #pragma once
-#include "FinalizationMessageAggregator.h"
+#include "SingleStepFinalizationMessageAggregator.h"
 #include "catapult/crypto_voting/OtsTypes.h"
 #include "catapult/functions.h"
 #include <map>
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace chain {
 
 	/// Aggregates finalization messages across multiple steps until consensus is reached.
 	class MultiStepFinalizationMessageAggregator {
 	public:
-		using AggregatorFactory = std::function<std::unique_ptr<FinalizationMessageAggregator> (const FinalizationConfiguration&)>;
+		using AggregatorFactory = std::function<std::unique_ptr<SingleStepFinalizationMessageAggregator> (
+				const finalization::FinalizationConfiguration&)>;
 		using ConsensusSink = consumer<const crypto::StepIdentifier&, const Hash256&>;
 
 	public:
 		/// Creates an aggregator around \a config, \a aggregatorFactory and \a consensusSink.
 		MultiStepFinalizationMessageAggregator(
-				const FinalizationConfiguration& config,
+				const finalization::FinalizationConfiguration& config,
 				const AggregatorFactory& aggregatorFactory,
 				const ConsensusSink& consensusSink);
 
@@ -46,18 +47,18 @@ namespace catapult { namespace finalization {
 	public:
 		/// Adds a finalization \a message to the aggregator that contributes \a numVotes votes.
 		/// \note This function is expected to be called after ProcessMessage.
-		void add(const FinalizationMessage& message, uint64_t numVotes);
+		void add(const model::FinalizationMessage& message, uint64_t numVotes);
 
 	private:
 		bool canAccept(const crypto::StepIdentifier& stepIdentifier);
 
-		bool add(FinalizationMessageAggregator& aggregator, const FinalizationMessage& message, uint64_t numVotes);
+		bool add(SingleStepFinalizationMessageAggregator& aggregator, const model::FinalizationMessage& message, uint64_t numVotes);
 
 	private:
-		FinalizationConfiguration m_config;
+		finalization::FinalizationConfiguration m_config;
 		AggregatorFactory m_aggregatorFactory;
 		ConsensusSink m_consensusSink;
 
-		std::map<crypto::StepIdentifier, std::unique_ptr<FinalizationMessageAggregator>> m_aggregators;
+		std::map<crypto::StepIdentifier, std::unique_ptr<SingleStepFinalizationMessageAggregator>> m_aggregators;
 	};
 }}

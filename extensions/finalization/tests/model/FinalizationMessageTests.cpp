@@ -18,8 +18,8 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "finalization/src/FinalizationMessage.h"
-#include "finalization/src/FinalizationContext.h"
+#include "finalization/src/model/FinalizationMessage.h"
+#include "finalization/src/model/FinalizationContext.h"
 #include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/crypto_voting/OtsTree.h"
 #include "catapult/utils/MemoryUtils.h"
@@ -32,7 +32,7 @@
 #include "tests/test/nodeps/NumericTestUtils.h"
 #include "tests/TestHarness.h"
 
-namespace catapult { namespace finalization {
+namespace catapult { namespace model {
 
 #define TEST_CLASS FinalizationMessageTests
 
@@ -143,8 +143,8 @@ namespace catapult { namespace finalization {
 			return options;
 		}
 
-		FinalizationConfiguration CreateConfigurationWithSize(uint32_t size) {
-			auto config = FinalizationConfiguration::Uninitialized();
+		finalization::FinalizationConfiguration CreateConfigurationWithSize(uint32_t size) {
+			auto config = finalization::FinalizationConfiguration::Uninitialized();
 			config.Size = size;
 			return config;
 		}

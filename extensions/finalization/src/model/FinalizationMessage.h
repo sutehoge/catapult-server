@@ -91,23 +91,31 @@ namespace catapult { namespace model {
 
 	// region ProcessMessage
 
+#define PROCESS_MESSAGE_RESULT_LIST \
+	/* Invalid message signature. */ \
+	ENUM_VALUE(Failure_Message_Signature) \
+	\
+	/* Invalid voter. */ \
+	ENUM_VALUE(Failure_Voter) \
+	\
+	/* Invalid sortition hash proof. */ \
+	ENUM_VALUE(Failure_Sortition_Hash_Proof) \
+	\
+	/* Invalid selection. */ \
+	ENUM_VALUE(Failure_Selection) \
+	\
+	/* Processing succeeded. */ \
+	ENUM_VALUE(Success)
+
+#define ENUM_VALUE(LABEL) LABEL,
 	/// Process message results.
 	enum class ProcessMessageResult {
-		/// Invalid message signature.
-		Failure_Message_Signature,
-
-		/// Invalid voter.
-		Failure_Voter,
-
-		/// Invalid sortition hash proof.
-		Failure_Sortition_Hash_Proof,
-
-		/// Invalid selection.
-		Failure_Selection,
-
-		/// Processing succeeded.
-		Success
+		PROCESS_MESSAGE_RESULT_LIST
 	};
+#undef ENUM_VALUE
+
+	/// Insertion operator for outputting \a value to \a out.
+	std::ostream& operator<<(std::ostream& out, ProcessMessageResult value);
 
 	/// Processes a finalization \a message using \a context.
 	std::pair<ProcessMessageResult, size_t> ProcessMessage(const FinalizationMessage& message, const FinalizationContext& context);

@@ -19,7 +19,8 @@
 **/
 
 #include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
-#include "finalization/src/model/FinalizationMessage.h"
+#include "finalization/src/FinalizationConfiguration.h"
+#include "finalization/tests/test/FinalizationMessageTestUtils.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace chain {
@@ -27,14 +28,49 @@ namespace catapult { namespace chain {
 #define TEST_CLASS MultiStepFinalizationMessageAggregatorTests
 
 	namespace {
-		using ConsensusTuples = std::vector<std::pair<crypto::StepIdentifier, Hash256>>;
+		using FP = FinalizationPoint;
 
-		// region MockFinalizationMessageAggregator
+		// region ConsensusTuple(s)
 
-		class MockFinalizationMessageAggregator : public SingleStepFinalizationMessageAggregator {
+		struct ConsensusTuple {
 		public:
-			explicit MockFinalizationMessageAggregator(const finalization::FinalizationConfiguration& config)
+			crypto::StepIdentifier StepIdentifier;
+			Hash256 Hash;
+			std::vector<Key> SignerPublicKeys;
+
+		public:
+			bool operator==(const ConsensusTuple& rhs) const {
+				return StepIdentifier == rhs.StepIdentifier && Hash == rhs.Hash && SignerPublicKeys == rhs.SignerPublicKeys;
+			}
+
+			friend std::ostream& operator<<(std::ostream& out, const ConsensusTuple& tuple) {
+				out << "step " << tuple.StepIdentifier << " hash " << tuple.Hash << " { ";
+
+				for (const auto& publicKey : tuple.SignerPublicKeys)
+					out << publicKey << " ";
+
+				out << "}";
+				return out;
+			}
+		};
+
+		using ConsensusTuples = std::vector<ConsensusTuple>;
+
+		// endregion
+
+		// region MockSingleStepFinalizationMessageAggregator
+
+		Key GetSignerPublicKey(const model::FinalizationMessage& message) {
+			return message.Signature.Root.ParentPublicKey;
+		}
+
+		class MockSingleStepFinalizationMessageAggregator : public SingleStepFinalizationMessageAggregator {
+		public:
+			MockSingleStepFinalizationMessageAggregator(
+					const finalization::FinalizationConfiguration& config,
+					const crypto::StepIdentifier& stepIdentifier)
 					: m_config(config)
+					, m_stepIdentifier(stepIdentifier)
 					, m_hasConsensus(false)
 					, m_numVotes(0)
 			{}
@@ -49,13 +85,17 @@ namespace catapult { namespace chain {
 			}
 
 		public:
+			const auto& stepIdentifier() const {
+				return m_stepIdentifier;
+			}
+
 			const auto& breadcrumbs() const {
 				return m_breadcrumbs;
 			}
 
 		public:
 			void add(const model::FinalizationMessage& message, uint64_t numVotes) override {
-				m_breadcrumbs.emplace_back(message.Signature.Root.ParentPublicKey, numVotes);
+				m_breadcrumbs.emplace_back(GetSignerPublicKey(message), numVotes);
 
 				m_numVotes += numVotes;
 				if (m_numVotes >= m_config.Threshold) {
@@ -66,6 +106,7 @@ namespace catapult { namespace chain {
 
 		private:
 			finalization::FinalizationConfiguration m_config;
+			crypto::StepIdentifier m_stepIdentifier;
 			bool m_hasConsensus;
 			Hash256 m_consensusHash;
 
@@ -75,18 +116,89 @@ namespace catapult { namespace chain {
 
 		// endregion
 
+		// region MessagesBuilder
+
+		class MessagesBuilder {
+		public:
+			size_t size() const {
+				return m_messages.size();
+			}
+
+			auto message(size_t index) const {
+				return m_messages[index];
+			}
+
+			auto hash(size_t index) const {
+				return m_hashes[index];
+			}
+
+			auto breadcrumbs(std::initializer_list<size_t> indexes) const {
+				std::vector<std::pair<Key, uint64_t>> breadcrumbs;
+				for (auto index : indexes)
+					breadcrumbs.emplace_back(m_signerPublicKeys[index], m_processMessageResults[index].second);
+
+				return breadcrumbs;
+			}
+
+			auto signerPublicKeys(std::initializer_list<size_t> indexes) const {
+				std::vector<Key> signerPublicKeys;
+				for (auto index : indexes)
+					signerPublicKeys.push_back(m_signerPublicKeys[index]);
+
+				return signerPublicKeys;
+			}
+
+			MessageProcessor createProcessor() const {
+				return [&messages = m_messages, &processMessageResults = m_processMessageResults](const auto& message) {
+					auto iter = std::find_if(messages.cbegin(), messages.cend(), [&message](const auto& pMessage) {
+						return GetSignerPublicKey(message) == GetSignerPublicKey(*pMessage);
+					});
+
+					if (messages.cend() == iter)
+						CATAPULT_THROW_INVALID_ARGUMENT("could not find message information");
+
+					auto messageIndex = static_cast<size_t>(std::distance(messages.cbegin(), iter));
+					return processMessageResults[messageIndex];
+				};
+			}
+
+		public:
+			void push(const crypto::StepIdentifier& stepIdentifier, uint64_t numVotes) {
+				push(stepIdentifier, numVotes, model::ProcessMessageResult::Success);
+			}
+
+			void push(const crypto::StepIdentifier& stepIdentifier, uint64_t numVotes, model::ProcessMessageResult processMessageResult) {
+				m_hashes.push_back(test::GenerateRandomByteArray<Hash256>());
+
+				auto pMessage = test::CreateMessage(stepIdentifier, m_hashes.back());
+				m_signerPublicKeys.push_back(GetSignerPublicKey(*pMessage));
+				m_messages.push_back(std::move(pMessage));
+
+				m_processMessageResults.emplace_back(processMessageResult, numVotes);
+			}
+
+		private:
+			std::vector<Hash256> m_hashes;
+			std::vector<Key> m_signerPublicKeys;
+			std::vector<std::shared_ptr<model::FinalizationMessage>> m_messages;
+
+			std::vector<std::pair<model::ProcessMessageResult, uint64_t>> m_processMessageResults;
+		};
+
+		// endregion
+
 		// region TestContext
 
 		class TestContext {
 		public:
-			TestContext(uint32_t threshold, uint32_t size) {
+			TestContext(uint32_t threshold, uint32_t size, const MessageProcessor& messageProcessor) {
 				auto config = finalization::FinalizationConfiguration::Uninitialized();
 				config.Size = size;
 				config.Threshold = threshold;
 
 				m_pMultiStepAggregator = std::make_unique<MultiStepFinalizationMessageAggregator>(
-						config,
-						createAggregatorFactory(),
+						messageProcessor,
+						createAggregatorFactory(config),
 						createConsensusSink());
 			}
 
@@ -105,62 +217,113 @@ namespace catapult { namespace chain {
 			}
 
 		private:
-			MultiStepFinalizationMessageAggregator::AggregatorFactory createAggregatorFactory() {
-				return [&singleStepAggregators = m_singleStepAggregators](const auto& config) {
-					auto pAggregator = std::make_unique<MockFinalizationMessageAggregator>(config);
+			SingleStepAggregatorFactory createAggregatorFactory(const finalization::FinalizationConfiguration& config) {
+				return [config, &singleStepAggregators = m_singleStepAggregators](const auto& stepIdentifier) {
+					auto pAggregator = std::make_unique<MockSingleStepFinalizationMessageAggregator>(config, stepIdentifier);
 					singleStepAggregators.push_back(pAggregator.get());
 					return pAggregator;
 				};
 			}
 
-			MultiStepFinalizationMessageAggregator::ConsensusSink createConsensusSink() {
-				return [&consensusTuples = m_consensusTuples](const auto& stepIdentifier, const auto& hash) {
-					consensusTuples.emplace_back(stepIdentifier, hash);
+			ConsensusSink createConsensusSink() {
+				return [&consensusTuples = m_consensusTuples](const auto& stepIdentifier, const auto& hash, const auto& proof) {
+					ConsensusTuple consensusTuple;
+					consensusTuple.StepIdentifier = stepIdentifier;
+					consensusTuple.Hash = hash;
+
+					for (const auto& pMessage : proof)
+						consensusTuple.SignerPublicKeys.push_back(GetSignerPublicKey(*pMessage));
+
+					consensusTuples.push_back(consensusTuple);
 				};
 			}
 
 		private:
 			std::unique_ptr<MultiStepFinalizationMessageAggregator> m_pMultiStepAggregator;
-			std::vector<MockFinalizationMessageAggregator*> m_singleStepAggregators;
+			std::vector<MockSingleStepFinalizationMessageAggregator*> m_singleStepAggregators;
 			ConsensusTuples m_consensusTuples;
 		};
 
 		// endregion
 
-		// region test utils
+		// region RunSinglePointMessagesTest
 
-		std::unique_ptr<model::FinalizationMessage> CreateMessage(const crypto::StepIdentifier& stepIdentifier, const Hash256& hash) {
-			uint32_t messageSize = sizeof(model::FinalizationMessage) + Hash256::Size;
-			auto pMessage = utils::MakeUniqueWithSize<model::FinalizationMessage>(messageSize);
-			pMessage->Size = messageSize;
-			pMessage->HashesCount = 1;
-			pMessage->StepIdentifier = stepIdentifier;
+		struct SingleStepAggregatorDescriptor {
+			bool IsValid;
+			crypto::StepIdentifier StepIdentifier;
+			std::initializer_list<size_t> BreadcrumbIndexes;
+		};
 
-			test::FillWithRandomData(pMessage->Signature.Root.ParentPublicKey);
-			*pMessage->HashesPtr() = hash;
-			return pMessage;
-		}
+		template<typename TTraits>
+		ConsensusTuples RunSinglePointMessagesTest(
+				const MessagesBuilder& messagesBuilder,
+				FP point,
+				size_t expectedAggregatorSize,
+				const std::vector<SingleStepAggregatorDescriptor>& descriptors) {
+			// Arrange:
+			TestContext context(2000, 3000, messagesBuilder.createProcessor());
+			auto& aggregator = context.multiStepAggregator();
 
-		std::pair<Key, uint64_t> MakeBreadcrumb(const Key& publicKey, uint64_t numVotes) {
-			return std::make_pair(publicKey, numVotes);
-		}
+			// Act:
+			TTraits::AddAll(aggregator, point, messagesBuilder);
 
-		ConsensusTuples MakeConsensusTuples(const crypto::StepIdentifier& stepIdentifier, const std::vector<Hash256>& hashes) {
-			ConsensusTuples consensusTuples;
-			for (const auto& hash : hashes)
-				consensusTuples.emplace_back(stepIdentifier, hash);
+			// Assert:
+			EXPECT_EQ(expectedAggregatorSize, aggregator.size());
 
-			return consensusTuples;
+			// - check single step aggregator
+			EXPECT_EQ(descriptors.size(), context.singleStepAggregators().size());
+			if (descriptors.size() != context.singleStepAggregators().size())
+				CATAPULT_THROW_INVALID_ARGUMENT("unexpected number of single step aggregators");
+
+			size_t i = 0;
+			size_t numValidDescriptors = 0;
+			for (const auto& descriptor : descriptors) {
+				if (!descriptor.IsValid) {
+					++i;
+					continue;
+				}
+
+				const auto& singleStepAggregator = context.singleStepAggregators()[i];
+				EXPECT_EQ(descriptor.StepIdentifier, singleStepAggregator->stepIdentifier()) << "at " << i;
+				EXPECT_EQ(messagesBuilder.breadcrumbs(descriptor.BreadcrumbIndexes), singleStepAggregator->breadcrumbs()) << "at " << i;
+				++numValidDescriptors;
+				++i;
+			}
+
+			// Sanity:
+			EXPECT_EQ(expectedAggregatorSize, numValidDescriptors);
+
+			return context.consensusTuples();
 		}
 
 		// endregion
 	}
 
+	// region traits
+
+	namespace {
+		struct ProcessTraits {
+			static void AddAll(MultiStepFinalizationMessageAggregator& aggregator, FP nextPoint, const MessagesBuilder& messagesBuilder) {
+				aggregator.setNextFinalizationPoint(nextPoint);
+
+				for (auto i = 0u; i < messagesBuilder.size(); ++i)
+					aggregator.add(messagesBuilder.message(i));
+			}
+		};
+	}
+
+#define PROCESS_REPROCESS_TEST(TEST_NAME) \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
+	TEST(TEST_CLASS, TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ProcessTraits>(); } \
+	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
+
+	// endregion
+
 	// region constructor
 
 	TEST(TEST_CLASS, InitiallyAggregatorIsEmpty) {
 		// Arrange:
-		TestContext context(2000, 3000);
+		TestContext context(2000, 3000, MessageProcessor());
 
 		// Act:
 		const auto& aggregator = context.multiStepAggregator();
@@ -174,232 +337,306 @@ namespace catapult { namespace chain {
 
 	// region single step
 
-	TEST(TEST_CLASS, CanAddSingleStepMessagesThatDoNotReachConsensus) {
-		// Arrange:
-		TestContext context(2000, 3000);
-		auto& aggregator = context.multiStepAggregator();
+	namespace {
+		constexpr const auto Single_Step_Identifier = crypto::StepIdentifier{ 3, 4, 5 };
 
-		auto pMessage1 = CreateMessage({ 3, 4, 5 }, test::GenerateRandomByteArray<Hash256>());
-		auto pMessage2 = CreateMessage({ 3, 4, 5 }, test::GenerateRandomByteArray<Hash256>());
-		auto pMessage3 = CreateMessage({ 3, 4, 5 }, test::GenerateRandomByteArray<Hash256>());
-
-		// Act:
-		aggregator.add(*pMessage1, 1000);
-		aggregator.add(*pMessage2, 400);
-		aggregator.add(*pMessage3, 500);
-
-		// Assert:
-		EXPECT_EQ(1u, aggregator.size());
-		EXPECT_TRUE(context.consensusTuples().empty());
-
-		// - check single step aggregator
-		ASSERT_EQ(1u, context.singleStepAggregators().size());
-
-		const auto& breadcrumbs = context.singleStepAggregators()[0]->breadcrumbs();
-		ASSERT_EQ(3u, breadcrumbs.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage1->Signature.Root.ParentPublicKey, 1000), breadcrumbs[0]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage2->Signature.Root.ParentPublicKey, 400), breadcrumbs[1]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage3->Signature.Root.ParentPublicKey, 500), breadcrumbs[2]);
+		template<typename TTraits>
+		ConsensusTuples RunSingleStepMessagesTest(
+				const MessagesBuilder& messagesBuilder,
+				std::initializer_list<size_t> expectedBreadcrumbIndexes) {
+			return RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(Single_Step_Identifier.Point), 1, {
+				{ true, Single_Step_Identifier, expectedBreadcrumbIndexes }
+			});
+		}
 	}
 
-	TEST(TEST_CLASS, CanAddSingleStepMessagesThatReachConsensus) {
+	PROCESS_REPROCESS_TEST(CanAddSingleStepMessagesThatDoNotReachConsensus) {
 		// Arrange:
-		TestContext context(2000, 3000);
-		auto& aggregator = context.multiStepAggregator();
-
-		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
-		auto pMessage1 = CreateMessage({ 3, 4, 5 }, hashes[0]);
-		auto pMessage2 = CreateMessage({ 3, 4, 5 }, hashes[1]);
-		auto pMessage3 = CreateMessage({ 3, 4, 5 }, hashes[2]);
+		MessagesBuilder messagesBuilder;
+		for (auto numVotes : std::initializer_list<uint64_t>{ 1000, 400, 500 })
+			messagesBuilder.push(Single_Step_Identifier, numVotes);
 
 		// Act:
-		aggregator.add(*pMessage1, 1000);
-		aggregator.add(*pMessage2, 750);
-		aggregator.add(*pMessage3, 250);
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 1, 2 });
 
 		// Assert:
-		EXPECT_EQ(1u, aggregator.size());
-		EXPECT_EQ(MakeConsensusTuples({ 3, 4, 5 }, { hashes[2] }), context.consensusTuples());
-
-		// - check single step aggregator
-		ASSERT_EQ(1u, context.singleStepAggregators().size());
-
-		const auto& breadcrumbs = context.singleStepAggregators()[0]->breadcrumbs();
-		ASSERT_EQ(3u, breadcrumbs.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage1->Signature.Root.ParentPublicKey, 1000), breadcrumbs[0]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage2->Signature.Root.ParentPublicKey, 750), breadcrumbs[1]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage3->Signature.Root.ParentPublicKey, 250), breadcrumbs[2]);
+		EXPECT_TRUE(consensusTuples.empty());
 	}
 
-	TEST(TEST_CLASS, CanAddSingleStepMessagesThatReachConsensusMultipleTimes) {
+	PROCESS_REPROCESS_TEST(CanAddSingleStepMessagesThatReachConsensus) {
 		// Arrange:
-		TestContext context(2000, 3000);
-		auto& aggregator = context.multiStepAggregator();
-
-		auto hashes = test::GenerateRandomDataVector<Hash256>(2);
-		auto pMessage1 = CreateMessage({ 3, 4, 5 }, hashes[0]);
-		auto pMessage2 = CreateMessage({ 3, 4, 5 }, hashes[0]);
-		auto pMessage3 = CreateMessage({ 3, 4, 5 }, hashes[1]);
+		MessagesBuilder messagesBuilder;
+		for (auto numVotes : std::initializer_list<uint64_t>{ 1000, 750, 250 })
+			messagesBuilder.push(Single_Step_Identifier, numVotes);
 
 		// Act:
-		aggregator.add(*pMessage1, 2000);
-		aggregator.add(*pMessage2, 1);
-		aggregator.add(*pMessage3, 2);
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 1, 2 });
 
 		// Assert:
-		EXPECT_EQ(1u, aggregator.size());
-		EXPECT_EQ(MakeConsensusTuples({ 3, 4, 5 }, { hashes[0], hashes[0], hashes[1] }), context.consensusTuples());
+		ConsensusTuples expectedConsensusTuples{
+			{ Single_Step_Identifier, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 1, 2 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
+	}
 
-		// - check single step aggregator
-		ASSERT_EQ(1u, context.singleStepAggregators().size());
+	PROCESS_REPROCESS_TEST(CanAddSingleStepMessagesThatReachConsensusMultipleTimes) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		for (auto numVotes : std::initializer_list<uint64_t>{ 2000, 1, 2 })
+			messagesBuilder.push(Single_Step_Identifier, numVotes);
 
-		const auto& breadcrumbs = context.singleStepAggregators()[0]->breadcrumbs();
-		ASSERT_EQ(3u, breadcrumbs.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage1->Signature.Root.ParentPublicKey, 2000), breadcrumbs[0]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage2->Signature.Root.ParentPublicKey, 1), breadcrumbs[1]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage3->Signature.Root.ParentPublicKey, 2), breadcrumbs[2]);
+		// Act:
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 1, 2 });
+
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ Single_Step_Identifier, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ Single_Step_Identifier, messagesBuilder.hash(1), messagesBuilder.signerPublicKeys({ 0, 1 }) },
+			{ Single_Step_Identifier, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 1, 2 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
+	}
+
+	PROCESS_REPROCESS_TEST(CanOnlyAddSingleStepMessagesThatCanBeProcessedSuccessfully) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push(Single_Step_Identifier, 1750);
+		messagesBuilder.push(Single_Step_Identifier, 500, model::ProcessMessageResult::Failure_Selection);
+		messagesBuilder.push(Single_Step_Identifier, 300);
+		messagesBuilder.push(Single_Step_Identifier, 100, model::ProcessMessageResult::Failure_Voter);
+
+		// Act:
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 2 });
+
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ Single_Step_Identifier, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 2 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
 
 	// endregion
 
 	// region multiple steps
 
-	TEST(TEST_CLASS, CanAddMultiStepMessagesThatDoNotReachConsensus) {
+	PROCESS_REPROCESS_TEST(CanAddMultiStepMessagesThatDoNotReachConsensus) {
 		// Arrange:
-		TestContext context(2000, 3000);
-		auto& aggregator = context.multiStepAggregator();
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 1000);
+		messagesBuilder.push({ 6, 8, 5 }, 400); // higher round
+		messagesBuilder.push({ 6, 2, 5 }, 700); // lower round
+		messagesBuilder.push({ 6, 4, 5 }, 900);
 
-		auto pMessage1 = CreateMessage({ 6, 4, 5 }, test::GenerateRandomByteArray<Hash256>());
-		auto pMessage2 = CreateMessage({ 8, 4, 5 }, test::GenerateRandomByteArray<Hash256>()); // greater step
-		auto pMessage3 = CreateMessage({ 4, 4, 5 }, test::GenerateRandomByteArray<Hash256>()); // less step
-
-		// Act:
-		aggregator.add(*pMessage1, 1000);
-		aggregator.add(*pMessage2, 400);
-		aggregator.add(*pMessage3, 700);
+		// Act: aggregators are kept from all steps because no consensus is reached
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 3, {
+			{ true, { 6, 4, 5 }, { 0, 3 } },
+			{ true, { 6, 8, 5 }, { 1 } },
+			{ true, { 6, 2, 5 }, { 2 } }
+		});
 
 		// Assert:
-		EXPECT_EQ(3u, aggregator.size());
-		EXPECT_TRUE(context.consensusTuples().empty());
-
-		// - check single step aggregators (no consensus was reached, so no pruning should happen)
-		ASSERT_EQ(3u, context.singleStepAggregators().size());
-
-		const auto& breadcrumbs1 = context.singleStepAggregators()[0]->breadcrumbs();
-		ASSERT_EQ(1u, breadcrumbs1.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage1->Signature.Root.ParentPublicKey, 1000), breadcrumbs1[0]);
-
-		const auto& breadcrumbs2 = context.singleStepAggregators()[1]->breadcrumbs();
-		ASSERT_EQ(1u, breadcrumbs2.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage2->Signature.Root.ParentPublicKey, 400), breadcrumbs2[0]);
-
-		const auto& breadcrumbs3 = context.singleStepAggregators()[2]->breadcrumbs();
-		ASSERT_EQ(1u, breadcrumbs3.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage3->Signature.Root.ParentPublicKey, 700), breadcrumbs3[0]);
+		EXPECT_TRUE(consensusTuples.empty());
 	}
 
-	TEST(TEST_CLASS, CanAddMultiStepMessagesThatReachConsensus) {
+	PROCESS_REPROCESS_TEST(CanAddMultiStepMessagesThatReachConsensus) {
 		// Arrange:
-		TestContext context(2000, 3000);
-		auto& aggregator = context.multiStepAggregator();
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 1000);
+		messagesBuilder.push({ 6, 8, 5 }, 400); // higher round
+		messagesBuilder.push({ 6, 2, 5 }, 700); // lower round
+		messagesBuilder.push({ 6, 4, 5 }, 1100);
 
-		auto hashes = test::GenerateRandomDataVector<Hash256>(4);
-		auto pMessage1 = CreateMessage({ 6, 4, 5 }, hashes[0]);
-		auto pMessage2 = CreateMessage({ 8, 4, 5 }, hashes[1]); // greater step
-		auto pMessage3 = CreateMessage({ 4, 4, 5 }, hashes[2]); // less step
-		auto pMessage4 = CreateMessage({ 6, 4, 5 }, hashes[3]);
+		// Act: only aggregators from steps no less than consensus step are kept
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 2, {
+			{ true, { 6, 4, 5 }, { 0, 3 } },
+			{ true, { 6, 8, 5 }, { 1 } },
+			{ false, { 6, 2, 5 }, { 2 } }
+		});
 
-		// Act: reach consensus on { 6, 4, 5 }
-		aggregator.add(*pMessage1, 1000);
-		aggregator.add(*pMessage2, 400);
-		aggregator.add(*pMessage3, 700);
-		aggregator.add(*pMessage4, 1100);
-
-		// Assert: aggregator associated with { 4, 4, 5 } is dropped
-		EXPECT_EQ(2u, aggregator.size());
-		EXPECT_EQ(MakeConsensusTuples({ 6, 4, 5 }, { hashes[3] }), context.consensusTuples());
-
-		// - check single step aggregators (last pointer is dangling)
-		ASSERT_EQ(3u, context.singleStepAggregators().size());
-
-		const auto& breadcrumbs1 = context.singleStepAggregators()[0]->breadcrumbs();
-		ASSERT_EQ(2u, breadcrumbs1.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage1->Signature.Root.ParentPublicKey, 1000), breadcrumbs1[0]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage4->Signature.Root.ParentPublicKey, 1100), breadcrumbs1[1]);
-
-		const auto& breadcrumbs2 = context.singleStepAggregators()[1]->breadcrumbs();
-		ASSERT_EQ(1u, breadcrumbs2.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage2->Signature.Root.ParentPublicKey, 400), breadcrumbs2[0]);
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ { 6, 4, 5 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
 
-	TEST(TEST_CLASS, CanOnlyAddMultiStepMessagesWithStepAtLeastLastConsensusStep) {
+	PROCESS_REPROCESS_TEST(CanAddMultiStepMessagesThatReachConsensusMultipleTimes) {
 		// Arrange:
-		TestContext context(2000, 3000);
-		auto& aggregator = context.multiStepAggregator();
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 2000);
+		messagesBuilder.push({ 6, 8, 5 }, 400); // higher round
+		messagesBuilder.push({ 6, 2, 5 }, 700); // lower round
+		messagesBuilder.push({ 6, 4, 5 }, 100);
 
-		auto hashes = test::GenerateRandomDataVector<Hash256>(4);
-		auto pMessage1 = CreateMessage({ 6, 4, 5 }, hashes[0]);
-		auto pMessage2 = CreateMessage({ 8, 4, 5 }, hashes[1]); // greater step
-		auto pMessage3 = CreateMessage({ 4, 4, 5 }, hashes[2]); // less step
-		auto pMessage4 = CreateMessage({ 6, 4, 5 }, hashes[3]);
+		// Act: { 6, 2, 5 } aggregator is not created because earlier step consensus was already reached
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 2, {
+			{ true, { 6, 4, 5 }, { 0, 3 } },
+			{ true, { 6, 8, 5 }, { 1 } }
+		});
 
-		// Act: reach consensus on { 6, 4, 5 }
-		aggregator.add(*pMessage1, 2000);
-		aggregator.add(*pMessage2, 400);
-		aggregator.add(*pMessage3, 700);
-		aggregator.add(*pMessage4, 100);
-
-		// Assert: aggregator associated with { 4, 4, 5 } was never added
-		EXPECT_EQ(2u, aggregator.size());
-		EXPECT_EQ(MakeConsensusTuples({ 6, 4, 5, }, { hashes[0], hashes[3] }), context.consensusTuples());
-
-		// - check single step aggregators
-		ASSERT_EQ(2u, context.singleStepAggregators().size());
-
-		const auto& breadcrumbs1 = context.singleStepAggregators()[0]->breadcrumbs();
-		ASSERT_EQ(2u, breadcrumbs1.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage1->Signature.Root.ParentPublicKey, 2000), breadcrumbs1[0]);
-		EXPECT_EQ(MakeBreadcrumb(pMessage4->Signature.Root.ParentPublicKey, 100), breadcrumbs1[1]);
-
-		const auto& breadcrumbs2 = context.singleStepAggregators()[1]->breadcrumbs();
-		ASSERT_EQ(1u, breadcrumbs2.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage2->Signature.Root.ParentPublicKey, 400), breadcrumbs2[0]);
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 4, 5 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
 
-	TEST(TEST_CLASS, CanAddMultiStepMessagesThatReachConsensusAtMultipleSteps) {
+	PROCESS_REPROCESS_TEST(CanAddMultiStepMessagesThatReachConsensusAtMultipleSteps) {
 		// Arrange:
-		TestContext context(2000, 3000);
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 2000);
+		messagesBuilder.push({ 6, 8, 5 }, 400); // higher round
+		messagesBuilder.push({ 6, 2, 5 }, 700); // lower round
+		messagesBuilder.push({ 6, 8, 8 }, 2100);
+
+		// Act:
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, {
+			{ false, { 6, 4, 5 }, { 0 } },
+			{ false, { 6, 8, 5 }, { 1 } },
+			{ true, { 6, 8, 8 }, { 3 } }
+		});
+
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 8, 8 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 3 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
+	}
+
+	PROCESS_REPROCESS_TEST(CanOnlyAddMultiStepMessagesThatCanBeProcessedSuccessfully) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 1750);
+		messagesBuilder.push({ 6, 8, 5 }, 500, model::ProcessMessageResult::Failure_Selection);
+		messagesBuilder.push({ 6, 4, 5 }, 300);
+		messagesBuilder.push({ 6, 4, 5 }, 100, model::ProcessMessageResult::Failure_Voter);
+
+		// Act: { 6, 8, 5 } aggregator is not created because message processing failed
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, {
+			{ true, { 6, 4, 5 }, { 0, 2 } }
+		});
+
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ { 6, 4, 5 }, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 2 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
+	}
+
+	PROCESS_REPROCESS_TEST(CannotAddMultiStepMessagesThatHaveUnexpectedFinalizationPoint) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 2000);
+		messagesBuilder.push({ 8, 8, 5 }, 2500); // higher FP
+		messagesBuilder.push({ 4, 2, 5 }, 2500); // lower FP
+		messagesBuilder.push({ 6, 4, 5 }, 100);
+
+		// Act: messages with different finalization points are ignored
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, {
+			{ true, { 6, 4, 5 }, { 0, 3 } }
+		});
+
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 4, 5 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
+	}
+
+	// endregion
+
+	// region message ownership
+
+	PROCESS_REPROCESS_TEST(AggregatorExtendsMessageLifetimes) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 2000);
+		messagesBuilder.push({ 6, 8, 5 }, 400); // higher round
+		messagesBuilder.push({ 6, 2, 5 }, 700); // lower round
+		messagesBuilder.push({ 6, 8, 8 }, 2100);
+
+		TestContext context(2000, 3000, messagesBuilder.createProcessor());
 		auto& aggregator = context.multiStepAggregator();
 
-		auto hashes = test::GenerateRandomDataVector<Hash256>(5);
-		auto pMessage1 = CreateMessage({ 4, 4, 5 }, hashes[0]);
-		auto pMessage2 = CreateMessage({ 4, 4, 4 }, hashes[1]);
-		auto pMessage3 = CreateMessage({ 4, 4, 5 }, hashes[2]);
-		auto pMessage4 = CreateMessage({ 8, 4, 5 }, hashes[3]);
-		auto pMessage5 = CreateMessage({ 7, 7, 7 }, hashes[4]);
+		// - calculate expected consensus tuples before destroying builder
+		ConsensusTuples expectedConsensusTuples{
+			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 8, 8 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 3 }) }
+		};
 
-		// Act: message 1 consensus at { 4, 4, 5 }, message 4 consensus at { 8, 4, 5 }
-		aggregator.add(*pMessage1, 2003);
-		aggregator.add(*pMessage2, 2002);
-		aggregator.add(*pMessage3, 100);
-		aggregator.add(*pMessage4, 2001);
-		aggregator.add(*pMessage5, 2004);
+		// Act:
+		TTraits::AddAll(aggregator, FP(6), messagesBuilder);
+		messagesBuilder = MessagesBuilder(); // destroy builder
 
 		// Assert:
 		EXPECT_EQ(1u, aggregator.size());
-		ConsensusTuples expectedConsensusTuples{
-			{ { 4, 4, 5 }, hashes[0] },
-			{ { 4, 4, 5 }, hashes[2] },
-			{ { 8, 4, 5 }, hashes[3] }
-		};
 		EXPECT_EQ(expectedConsensusTuples, context.consensusTuples());
+	}
 
-		// - check single step aggregators (first pointer is dangling)
-		ASSERT_EQ(2u, context.singleStepAggregators().size());
+	// endregion
 
-		const auto& breadcrumbs2 = context.singleStepAggregators()[1]->breadcrumbs();
-		ASSERT_EQ(1u, breadcrumbs2.size());
-		EXPECT_EQ(MakeBreadcrumb(pMessage4->Signature.Root.ParentPublicKey, 2001), breadcrumbs2[0]);
+	// region setNextFinalizationPoint
+
+	TEST(TEST_CLASS, CannotSetNextFinalizationPointToSmallerValue) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 1100);
+		messagesBuilder.push({ 8, 4, 5 }, 400);
+		messagesBuilder.push({ 4, 4, 5 }, 700);
+
+		TestContext context(2000, 3000, messagesBuilder.createProcessor());
+		auto& aggregator = context.multiStepAggregator();
+
+		ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
+
+		// Act + Assert:
+		EXPECT_THROW(aggregator.setNextFinalizationPoint(FP(5)), catapult_invalid_argument);
+	}
+
+	TEST(TEST_CLASS, CannotSetNextFinalizationPointToSameValue) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 1100);
+		messagesBuilder.push({ 8, 4, 5 }, 400);
+		messagesBuilder.push({ 4, 4, 5 }, 700);
+
+		TestContext context(2000, 3000, messagesBuilder.createProcessor());
+		auto& aggregator = context.multiStepAggregator();
+
+		ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
+
+		// Act:
+		aggregator.setNextFinalizationPoint(FP(6));
+
+		// Assert:
+		EXPECT_EQ(1u, aggregator.size());
+		EXPECT_TRUE(context.consensusTuples().empty());
+	}
+
+	TEST(TEST_CLASS, CanSetNextFinalizationPointToLargerValue) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 1100);
+		messagesBuilder.push({ 8, 4, 5 }, 400);
+		messagesBuilder.push({ 4, 4, 5 }, 700);
+
+		TestContext context(2000, 3000, messagesBuilder.createProcessor());
+		auto& aggregator = context.multiStepAggregator();
+
+		ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
+
+		// Sanity:
+		EXPECT_EQ(1u, aggregator.size());
+
+		// Act:
+		aggregator.setNextFinalizationPoint(FP(7));
+
+		// Assert:
+		EXPECT_EQ(0u, aggregator.size());
+		EXPECT_TRUE(context.consensusTuples().empty());
 	}
 
 	// endregion

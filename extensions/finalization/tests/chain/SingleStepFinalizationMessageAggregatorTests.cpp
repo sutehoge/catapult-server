@@ -19,7 +19,9 @@
 **/
 
 #include "finalization/src/chain/SingleStepFinalizationMessageAggregator.h"
+#include "finalization/src/FinalizationConfiguration.h"
 #include "finalization/src/model/FinalizationMessage.h"
+#include "finalization/tests/test/FinalizationMessageTestUtils.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace chain {
@@ -37,14 +39,7 @@ namespace catapult { namespace chain {
 		}
 
 		std::unique_ptr<model::FinalizationMessage> CreateMessage(const Hash256& hash) {
-			uint32_t messageSize = sizeof(model::FinalizationMessage) + Hash256::Size;
-			auto pMessage = utils::MakeUniqueWithSize<model::FinalizationMessage>(messageSize);
-			pMessage->Size = messageSize;
-			pMessage->HashesCount = 1;
-
-			test::FillWithRandomData(pMessage->Signature.Root.ParentPublicKey);
-			*pMessage->HashesPtr() = hash;
-			return pMessage;
+			return test::CreateMessage(hash);
 		}
 
 		void AssertNoConsensus(const SingleStepFinalizationMessageAggregator& aggregator, const std::string& message = "") {

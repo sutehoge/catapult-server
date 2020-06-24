@@ -19,9 +19,7 @@
 **/
 
 #pragma once
-#include "SingleStepFinalizationMessageAggregator.h"
-#include "catapult/crypto_voting/OtsTypes.h"
-#include "catapult/functions.h"
+#include "FinalizationAggregatorTypes.h"
 #include <map>
 
 namespace catapult { namespace chain {
@@ -29,15 +27,10 @@ namespace catapult { namespace chain {
 	/// Aggregates finalization messages across multiple steps until consensus is reached.
 	class MultiStepFinalizationMessageAggregator {
 	public:
-		using AggregatorFactory = std::function<std::unique_ptr<SingleStepFinalizationMessageAggregator> (
-				const finalization::FinalizationConfiguration&)>;
-		using ConsensusSink = consumer<const crypto::StepIdentifier&, const Hash256&>;
-
-	public:
-		/// Creates an aggregator around \a config, \a aggregatorFactory and \a consensusSink.
+		/// Creates an aggregator around \a messageProcessor, \a aggregatorFactory and \a consensusSink.
 		MultiStepFinalizationMessageAggregator(
-				const finalization::FinalizationConfiguration& config,
-				const AggregatorFactory& aggregatorFactory,
+				const MessageProcessor& messageProcessor,
+				const SingleStepAggregatorFactory& aggregatorFactory,
 				const ConsensusSink& consensusSink);
 
 	public:
@@ -45,20 +38,34 @@ namespace catapult { namespace chain {
 		size_t size() const;
 
 	public:
-		/// Adds a finalization \a message to the aggregator that contributes \a numVotes votes.
-		/// \note This function is expected to be called after ProcessMessage.
-		void add(const model::FinalizationMessage& message, uint64_t numVotes);
+		/// Sets the next finalization \a point.
+		/// \note Only messages with a matching finalization point will be processed immediately.
+		void setNextFinalizationPoint(FinalizationPoint point);
+
+		/// Adds a finalization message (\a pMessage) to the aggregator.
+		/// \note Message is a shared_ptr because it is detached from an EntityRange and is kept alive with its associated step.
+		void add(const std::shared_ptr<model::FinalizationMessage>& pMessage);
+
+	private:
+		struct StepDataTuple {
+			std::unique_ptr<SingleStepFinalizationMessageAggregator> pAggregator;
+			FinalizationProof Proof;
+		};
 
 	private:
 		bool canAccept(const crypto::StepIdentifier& stepIdentifier);
 
-		bool add(SingleStepFinalizationMessageAggregator& aggregator, const model::FinalizationMessage& message, uint64_t numVotes);
+		std::pair<uint64_t, bool> process(const model::FinalizationMessage& message);
+
+		bool add(StepDataTuple& stepDataTuple, const model::FinalizationMessage& message, uint64_t numVotes);
 
 	private:
-		finalization::FinalizationConfiguration m_config;
-		AggregatorFactory m_aggregatorFactory;
+		MessageProcessor m_messageProcessor;
+		SingleStepAggregatorFactory m_aggregatorFactory;
 		ConsensusSink m_consensusSink;
 
-		std::map<crypto::StepIdentifier, std::unique_ptr<SingleStepFinalizationMessageAggregator>> m_aggregators;
+		crypto::StepIdentifier m_minStepIdentier;
+		FinalizationPoint m_nextFinalizationPoint;
+		std::map<crypto::StepIdentifier, StepDataTuple> m_stepDataTuplesMap;
 	};
 }}

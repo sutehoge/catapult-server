@@ -19,11 +19,13 @@
 **/
 
 #pragma once
-#include "finalization/src/FinalizationConfiguration.h"
 #include "catapult/types.h"
 #include <memory>
 
-namespace catapult { namespace model { struct FinalizationMessage; } }
+namespace catapult {
+	namespace finalization { struct FinalizationConfiguration; }
+	namespace model { struct FinalizationMessage; }
+}
 
 namespace catapult { namespace chain {
 

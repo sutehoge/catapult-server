@@ -23,9 +23,16 @@
 #include "catapult/crypto/Hashes.h"
 #include "catapult/crypto/Sortition.h"
 #include "catapult/crypto_voting/OtsTree.h"
+#include "catapult/utils/MacroBasedEnumIncludes.h"
 #include "catapult/utils/MemoryUtils.h"
 
 namespace catapult { namespace model {
+
+#define DEFINE_ENUM ProcessMessageResult
+#define ENUM_LIST PROCESS_MESSAGE_RESULT_LIST
+#include "catapult/utils/MacroBasedEnum.h"
+#undef ENUM_LIST
+#undef DEFINE_ENUM
 
 	namespace {
 #pragma pack(push, 1)

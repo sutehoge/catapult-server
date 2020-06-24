@@ -19,6 +19,7 @@
 **/
 
 #include "SingleStepFinalizationMessageAggregator.h"
+#include "finalization/src/FinalizationConfiguration.h"
 #include "finalization/src/model/FinalizationMessage.h"
 #include "catapult/utils/ArraySet.h"
 

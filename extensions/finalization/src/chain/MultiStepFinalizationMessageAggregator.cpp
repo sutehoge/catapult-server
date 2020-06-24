@@ -19,53 +19,83 @@
 **/
 
 #include "MultiStepFinalizationMessageAggregator.h"
-#include "finalization/src/model/FinalizationMessage.h"
 
 namespace catapult { namespace chain {
 
 	MultiStepFinalizationMessageAggregator::MultiStepFinalizationMessageAggregator(
-			const finalization::FinalizationConfiguration& config,
-			const AggregatorFactory& aggregatorFactory,
+			const MessageProcessor& messageProcessor,
+			const SingleStepAggregatorFactory& aggregatorFactory,
 			const ConsensusSink& consensusSink)
-			: m_config(config)
+			: m_messageProcessor(messageProcessor)
 			, m_aggregatorFactory(aggregatorFactory)
 			, m_consensusSink(consensusSink)
+			, m_minStepIdentier({ 0, 0, 0 })
 	{}
 
 	size_t MultiStepFinalizationMessageAggregator::size() const {
-		return m_aggregators.size();
+		return m_stepDataTuplesMap.size();
 	}
 
-	void MultiStepFinalizationMessageAggregator::add(const model::FinalizationMessage& message, uint64_t numVotes) {
-		if (!canAccept(message.StepIdentifier))
+	void MultiStepFinalizationMessageAggregator::setNextFinalizationPoint(FinalizationPoint point) {
+		if (point < m_nextFinalizationPoint)
+			CATAPULT_THROW_INVALID_ARGUMENT_1("cannot set finalization point to lower value", m_nextFinalizationPoint);
+
+		if (m_nextFinalizationPoint == point)
 			return;
 
-		auto iter = m_aggregators.find(message.StepIdentifier);
-		if (m_aggregators.end() == iter)
-			iter = m_aggregators.emplace(message.StepIdentifier, m_aggregatorFactory(m_config)).first;
+		m_minStepIdentier = { point.unwrap(), 0, 0 };
+		m_nextFinalizationPoint = point;
+		m_stepDataTuplesMap.clear();
+	}
 
-		if (add(*iter->second, message, numVotes))
-			m_aggregators.erase(m_aggregators.begin(), iter);
+	void MultiStepFinalizationMessageAggregator::add(const std::shared_ptr<model::FinalizationMessage>& pMessage) {
+		const auto& stepIdentifier = pMessage->StepIdentifier;
+		if (!canAccept(stepIdentifier))
+			return;
+
+		auto processResultPair = process(*pMessage);
+		if (!processResultPair.second)
+			return;
+
+		auto iter = m_stepDataTuplesMap.find(stepIdentifier);
+		if (m_stepDataTuplesMap.end() == iter) {
+			iter = m_stepDataTuplesMap.emplace(stepIdentifier, StepDataTuple()).first;
+			iter->second.pAggregator = m_aggregatorFactory(pMessage->StepIdentifier);
+		}
+
+		iter->second.Proof.push_back(pMessage);
+
+		if (add(iter->second, *pMessage, processResultPair.first)) {
+			// new consensus was reached, so drop older messages
+			m_minStepIdentier = iter->first;
+			m_stepDataTuplesMap.erase(m_stepDataTuplesMap.begin(), iter);
+		}
 	}
 
 	bool MultiStepFinalizationMessageAggregator::canAccept(const crypto::StepIdentifier& stepIdentifier) {
-		if (m_aggregators.empty())
-			return true;
-
-		// only accept new messages for a step no less than the last consensus step
-		const auto& aggregatePair = *m_aggregators.cbegin();
-		return stepIdentifier >= aggregatePair.first || !aggregatePair.second->hasConsensus();
+		// only accept messages for the current FP that are no less than the min consensus step
+		return m_nextFinalizationPoint == FinalizationPoint(stepIdentifier.Point) && stepIdentifier >= m_minStepIdentier;
 	}
 
 	bool MultiStepFinalizationMessageAggregator::add(
-			SingleStepFinalizationMessageAggregator& aggregator,
+			StepDataTuple& stepDataTuple,
 			const model::FinalizationMessage& message,
 			uint64_t numVotes) {
-		aggregator.add(message, numVotes);
-		if (!aggregator.hasConsensus())
+		stepDataTuple.pAggregator->add(message, numVotes);
+		if (!stepDataTuple.pAggregator->hasConsensus())
 			return false;
 
-		m_consensusSink(message.StepIdentifier, aggregator.consensusHash());
+		m_consensusSink(message.StepIdentifier, stepDataTuple.pAggregator->consensusHash(), stepDataTuple.Proof);
 		return true;
+	}
+
+	std::pair<uint64_t, bool> MultiStepFinalizationMessageAggregator::process(const model::FinalizationMessage& message) {
+		auto processResultPair = m_messageProcessor(message);
+		if (model::ProcessMessageResult::Success != processResultPair.first) {
+			CATAPULT_LOG(warning) << "rejecting finalization message with result " << processResultPair.first;
+			return std::make_pair(0, false);
+		}
+
+		return std::make_pair(processResultPair.second, true);
 	}
 }}

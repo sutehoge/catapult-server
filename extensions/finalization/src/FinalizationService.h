@@ -19,11 +19,11 @@
 **/
 
 #pragma once
-#include "FinalizationHandlerTypes.h"
-#include "catapult/ionet/PacketHandlers.h"
+#include "catapult/extensions/ServiceRegistrar.h"
 
-namespace catapult { namespace handlers {
+namespace catapult { namespace finalization {
 
-	/// Registers a push messages handler in \a handlers that forwards messages to \a messageRangeHandler.
-	void RegisterPushMessagesHandler(ionet::ServerPacketHandlers& handlers, const MessageRangeHandler& messageRangeHandler);
+	/// Creates a registrar for a finalization service.
+	/// \note This service is responsible for sending messages between voting nodes.
+	DECLARE_SERVICE_REGISTRAR(Finalization)();
 }}

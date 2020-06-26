@@ -76,6 +76,13 @@ namespace catapult { namespace model {
 
 #pragma pack(pop)
 
+	// region CalculateMessageHash
+
+	/// Calculates a hash for \a message.
+	Hash256 CalculateMessageHash(const FinalizationMessage& message);
+
+	// endregion
+
 	// region PrepareMessage
 
 	/// Prepares a finalization message given \a otsTree, \a vrfKeyPair, \a stepIdentifier, \a hashes and \a context.

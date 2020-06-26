@@ -21,6 +21,7 @@
 #include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
 #include "finalization/src/FinalizationConfiguration.h"
 #include "finalization/tests/test/FinalizationMessageTestUtils.h"
+#include "tests/test/nodeps/LockTestUtils.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace chain {
@@ -191,12 +192,17 @@ namespace catapult { namespace chain {
 
 		class TestContext {
 		public:
-			TestContext(uint32_t threshold, uint32_t size, const MessageProcessor& messageProcessor) {
+			TestContext(uint32_t threshold, uint32_t size, const MessageProcessor& messageProcessor)
+					: TestContext(threshold, size, 10'000'000, messageProcessor)
+			{}
+
+			TestContext(uint32_t threshold, uint32_t size, uint64_t maxResponseSize, const MessageProcessor& messageProcessor) {
 				auto config = finalization::FinalizationConfiguration::Uninitialized();
 				config.Size = size;
 				config.Threshold = threshold;
 
 				m_pMultiStepAggregator = std::make_unique<MultiStepFinalizationMessageAggregator>(
+						maxResponseSize,
 						messageProcessor,
 						createAggregatorFactory(config),
 						createConsensusSink());
@@ -259,6 +265,7 @@ namespace catapult { namespace chain {
 				const MessagesBuilder& messagesBuilder,
 				FP point,
 				size_t expectedAggregatorSize,
+				const crypto::StepIdentifier& expectedMinStepIdentifier,
 				const std::vector<SingleStepAggregatorDescriptor>& descriptors) {
 			// Arrange:
 			TestContext context(2000, 3000, messagesBuilder.createProcessor());
@@ -268,7 +275,8 @@ namespace catapult { namespace chain {
 			TTraits::AddAll(aggregator, point, messagesBuilder);
 
 			// Assert:
-			EXPECT_EQ(expectedAggregatorSize, aggregator.size());
+			EXPECT_EQ(expectedAggregatorSize, aggregator.view().size());
+			EXPECT_EQ(expectedMinStepIdentifier, aggregator.view().minStepIdentifier());
 
 			// - check single step aggregator
 			EXPECT_EQ(descriptors.size(), context.singleStepAggregators().size());
@@ -304,10 +312,10 @@ namespace catapult { namespace chain {
 	namespace {
 		struct ProcessTraits {
 			static void AddAll(MultiStepFinalizationMessageAggregator& aggregator, FP nextPoint, const MessagesBuilder& messagesBuilder) {
-				aggregator.setNextFinalizationPoint(nextPoint);
+				aggregator.modifier().setNextFinalizationPoint(nextPoint);
 
 				for (auto i = 0u; i < messagesBuilder.size(); ++i)
-					aggregator.add(messagesBuilder.message(i));
+					aggregator.modifier().add(messagesBuilder.message(i));
 			}
 		};
 	}
@@ -329,7 +337,9 @@ namespace catapult { namespace chain {
 		const auto& aggregator = context.multiStepAggregator();
 
 		// Assert:
-		EXPECT_EQ(0u, aggregator.size());
+		EXPECT_EQ(0u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 0, 0, 0 }), aggregator.view().minStepIdentifier());
+
 		EXPECT_TRUE(context.consensusTuples().empty());
 	}
 
@@ -343,8 +353,9 @@ namespace catapult { namespace chain {
 		template<typename TTraits>
 		ConsensusTuples RunSingleStepMessagesTest(
 				const MessagesBuilder& messagesBuilder,
+				const crypto::StepIdentifier& expectedMinStepIdentifier,
 				std::initializer_list<size_t> expectedBreadcrumbIndexes) {
-			return RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(Single_Step_Identifier.Point), 1, {
+			return RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(Single_Step_Identifier.Point), 1, expectedMinStepIdentifier, {
 				{ true, Single_Step_Identifier, expectedBreadcrumbIndexes }
 			});
 		}
@@ -357,7 +368,7 @@ namespace catapult { namespace chain {
 			messagesBuilder.push(Single_Step_Identifier, numVotes);
 
 		// Act:
-		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 1, 2 });
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { Single_Step_Identifier.Point, 0, 0 }, { 0, 1, 2 });
 
 		// Assert:
 		EXPECT_TRUE(consensusTuples.empty());
@@ -370,7 +381,7 @@ namespace catapult { namespace chain {
 			messagesBuilder.push(Single_Step_Identifier, numVotes);
 
 		// Act:
-		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 1, 2 });
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, Single_Step_Identifier, { 0, 1, 2 });
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
@@ -386,7 +397,7 @@ namespace catapult { namespace chain {
 			messagesBuilder.push(Single_Step_Identifier, numVotes);
 
 		// Act:
-		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 1, 2 });
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, Single_Step_Identifier, { 0, 1, 2 });
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
@@ -406,7 +417,7 @@ namespace catapult { namespace chain {
 		messagesBuilder.push(Single_Step_Identifier, 100, model::ProcessMessageResult::Failure_Voter);
 
 		// Act:
-		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, { 0, 2 });
+		auto consensusTuples = RunSingleStepMessagesTest<TTraits>(messagesBuilder, Single_Step_Identifier, { 0, 2 });
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
@@ -428,7 +439,7 @@ namespace catapult { namespace chain {
 		messagesBuilder.push({ 6, 4, 5 }, 900);
 
 		// Act: aggregators are kept from all steps because no consensus is reached
-		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 3, {
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 3, { 6, 0, 0 }, {
 			{ true, { 6, 4, 5 }, { 0, 3 } },
 			{ true, { 6, 8, 5 }, { 1 } },
 			{ true, { 6, 2, 5 }, { 2 } }
@@ -447,7 +458,7 @@ namespace catapult { namespace chain {
 		messagesBuilder.push({ 6, 4, 5 }, 1100);
 
 		// Act: only aggregators from steps no less than consensus step are kept
-		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 2, {
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 2, { 6, 4, 5 }, {
 			{ true, { 6, 4, 5 }, { 0, 3 } },
 			{ true, { 6, 8, 5 }, { 1 } },
 			{ false, { 6, 2, 5 }, { 2 } }
@@ -469,7 +480,7 @@ namespace catapult { namespace chain {
 		messagesBuilder.push({ 6, 4, 5 }, 100);
 
 		// Act: { 6, 2, 5 } aggregator is not created because earlier step consensus was already reached
-		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 2, {
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 2, { 6, 4, 5 }, {
 			{ true, { 6, 4, 5 }, { 0, 3 } },
 			{ true, { 6, 8, 5 }, { 1 } }
 		});
@@ -491,7 +502,7 @@ namespace catapult { namespace chain {
 		messagesBuilder.push({ 6, 8, 8 }, 2100);
 
 		// Act:
-		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, {
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, { 6, 8, 8 }, {
 			{ false, { 6, 4, 5 }, { 0 } },
 			{ false, { 6, 8, 5 }, { 1 } },
 			{ true, { 6, 8, 8 }, { 3 } }
@@ -514,7 +525,7 @@ namespace catapult { namespace chain {
 		messagesBuilder.push({ 6, 4, 5 }, 100, model::ProcessMessageResult::Failure_Voter);
 
 		// Act: { 6, 8, 5 } aggregator is not created because message processing failed
-		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, {
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, { 6, 4, 5 }, {
 			{ true, { 6, 4, 5 }, { 0, 2 } }
 		});
 
@@ -534,7 +545,7 @@ namespace catapult { namespace chain {
 		messagesBuilder.push({ 6, 4, 5 }, 100);
 
 		// Act: messages with different finalization points are ignored
-		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, {
+		auto consensusTuples = RunSinglePointMessagesTest<TTraits>(messagesBuilder, FP(6), 1, { 6, 4, 5 }, {
 			{ true, { 6, 4, 5 }, { 0, 3 } }
 		});
 
@@ -572,7 +583,9 @@ namespace catapult { namespace chain {
 		messagesBuilder = MessagesBuilder(); // destroy builder
 
 		// Assert:
-		EXPECT_EQ(1u, aggregator.size());
+		EXPECT_EQ(1u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 6, 8, 8 }), aggregator.view().minStepIdentifier());
+
 		EXPECT_EQ(expectedConsensusTuples, context.consensusTuples());
 	}
 
@@ -592,8 +605,15 @@ namespace catapult { namespace chain {
 
 		ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
 
+		// Sanity:
+		EXPECT_EQ(1u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 6, 0, 0 }), aggregator.view().minStepIdentifier());
+
 		// Act + Assert:
-		EXPECT_THROW(aggregator.setNextFinalizationPoint(FP(5)), catapult_invalid_argument);
+		EXPECT_THROW(aggregator.modifier().setNextFinalizationPoint(FP(5)), catapult_invalid_argument);
+
+		EXPECT_EQ(1u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 6, 0, 0 }), aggregator.view().minStepIdentifier());
 	}
 
 	TEST(TEST_CLASS, CannotSetNextFinalizationPointToSameValue) {
@@ -608,11 +628,17 @@ namespace catapult { namespace chain {
 
 		ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
 
+		// Sanity:
+		EXPECT_EQ(1u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 6, 0, 0 }), aggregator.view().minStepIdentifier());
+
 		// Act:
-		aggregator.setNextFinalizationPoint(FP(6));
+		aggregator.modifier().setNextFinalizationPoint(FP(6));
 
 		// Assert:
-		EXPECT_EQ(1u, aggregator.size());
+		EXPECT_EQ(1u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 6, 0, 0 }), aggregator.view().minStepIdentifier());
+
 		EXPECT_TRUE(context.consensusTuples().empty());
 	}
 
@@ -629,15 +655,265 @@ namespace catapult { namespace chain {
 		ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
 
 		// Sanity:
-		EXPECT_EQ(1u, aggregator.size());
+		EXPECT_EQ(1u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 6, 0, 0 }), aggregator.view().minStepIdentifier());
 
 		// Act:
-		aggregator.setNextFinalizationPoint(FP(7));
+		aggregator.modifier().setNextFinalizationPoint(FP(7));
 
 		// Assert:
-		EXPECT_EQ(0u, aggregator.size());
+		EXPECT_EQ(0u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 7, 0, 0 }), aggregator.view().minStepIdentifier());
+
 		EXPECT_TRUE(context.consensusTuples().empty());
 	}
+
+	// endregion
+
+	// region shortHashes
+
+	namespace {
+		auto ToShortHashes(const MessagesBuilder& messagesBuilder) {
+			std::vector<utils::ShortHash> shortHashes;
+			for (auto i = 0u; i < messagesBuilder.size(); ++i)
+				shortHashes.push_back(utils::ToShortHash(model::CalculateMessageHash(*messagesBuilder.message(i))));
+
+			return shortHashes;
+		}
+	}
+
+	TEST(TEST_CLASS, ShortHashesReturnsNoShortHashesWhenAggregtorIsEmpty) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+
+		TestContext context(2000, 3000, messagesBuilder.createProcessor());
+		auto& aggregator = context.multiStepAggregator();
+
+		// Act:
+		auto shortHashes = aggregator.view().shortHashes();
+
+		// Assert:
+		EXPECT_TRUE(shortHashes.empty());
+	}
+
+	TEST(TEST_CLASS, ShortHashesReturnsShortHashesForAllMessages) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		messagesBuilder.push({ 6, 4, 5 }, 100);
+		messagesBuilder.push({ 6, 2, 5 }, 200);
+		messagesBuilder.push({ 6, 8, 5 }, 300);
+		messagesBuilder.push({ 6, 4, 5 }, 400);
+		messagesBuilder.push({ 6, 2, 5 }, 500);
+		messagesBuilder.push({ 6, 8, 5 }, 600);
+
+		auto messageShortHashes = ToShortHashes(messagesBuilder);
+		auto messageShortHashesSet = utils::ShortHashesSet(messageShortHashes.cbegin(), messageShortHashes.cend());
+
+		TestContext context(2000, 3000, messagesBuilder.createProcessor());
+		auto& aggregator = context.multiStepAggregator();
+
+		ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
+
+		// Act:
+		auto shortHashes = aggregator.view().shortHashes();
+
+		// Assert:
+		EXPECT_EQ(6u, shortHashes.size());
+
+		// - cannot check shortHashes exactly because there's no sorting for messages within a step
+		for (auto shortHash : shortHashes)
+			EXPECT_CONTAINS(messageShortHashesSet, shortHash);
+	}
+
+	// endregion
+
+	// region unknownMessages
+
+	namespace {
+		auto ToShortHashes(const std::vector<std::shared_ptr<const model::FinalizationMessage>>& messages) {
+			utils::ShortHashesSet shortHashes;
+			for (const auto& pMessage : messages)
+				shortHashes.insert(utils::ToShortHash(model::CalculateMessageHash(*pMessage)));
+
+			return shortHashes;
+		}
+
+		template<typename TAction>
+		void RunUnknownMessagesTest(TAction action) {
+			// Arrange:
+			MessagesBuilder messagesBuilder;
+			messagesBuilder.push({ 6, 4, 5 }, 100);
+			messagesBuilder.push({ 6, 2, 5 }, 200);
+			messagesBuilder.push({ 6, 8, 5 }, 300);
+			messagesBuilder.push({ 6, 4, 5 }, 400);
+			messagesBuilder.push({ 6, 2, 5 }, 500);
+			messagesBuilder.push({ 6, 8, 5 }, 600);
+
+			auto shortHashes = ToShortHashes(messagesBuilder);
+
+			TestContext context(2000, 3000, messagesBuilder.createProcessor());
+			auto& aggregator = context.multiStepAggregator();
+
+			ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
+
+			// Act + Assert:
+			action(aggregator, shortHashes);
+		}
+	}
+
+	TEST(TEST_CLASS, UnknownMessagesReturnsNoMessagesWhenAggregatorIsEmpty) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+
+		TestContext context(2000, 3000, messagesBuilder.createProcessor());
+		auto& aggregator = context.multiStepAggregator();
+
+		// Act:
+		auto unknownMessages = aggregator.view().unknownMessages({ 6, 0, 0 }, {});
+
+		// Assert:
+		EXPECT_TRUE(unknownMessages.empty());
+	}
+
+	TEST(TEST_CLASS, UnknownMessagesReturnsAllMessagesWhenFilterIsEmpty) {
+		// Arrange:
+		RunUnknownMessagesTest([](const auto& aggregator, const auto& shortHashes) {
+			// Act:
+			auto unknownMessages = aggregator.view().unknownMessages({ 6, 0, 0 }, {});
+
+			// Assert:
+			EXPECT_EQ(6u, unknownMessages.size());
+			EXPECT_EQ(utils::ShortHashesSet(shortHashes.cbegin(), shortHashes.cend()), ToShortHashes(unknownMessages));
+		});
+	}
+
+	TEST(TEST_CLASS, UnknownMessagesReturnsAllMessagesNotInFilter) {
+		// Arrange:
+		RunUnknownMessagesTest([](const auto& aggregator, const auto& shortHashes) {
+			// Act:
+			auto unknownMessages = aggregator.view().unknownMessages({ 6, 0, 0 }, { shortHashes[0], shortHashes[1], shortHashes[4] });
+
+			// Assert:
+			EXPECT_EQ(3u, unknownMessages.size());
+			EXPECT_EQ(utils::ShortHashesSet({ shortHashes[2], shortHashes[3], shortHashes[5] }), ToShortHashes(unknownMessages));
+		});
+	}
+
+	TEST(TEST_CLASS, UnknownMessagesReturnsNoMessagesWhenAllMessagesAreKnown) {
+		// Arrange:
+		RunUnknownMessagesTest([](const auto& aggregator, const auto& shortHashes) {
+			// Act:
+			auto shortHashesSet = utils::ShortHashesSet(shortHashes.cbegin(), shortHashes.cend());
+			auto unknownMessages = aggregator.view().unknownMessages({ 6, 0, 0 }, shortHashesSet);
+
+			// Assert:
+			EXPECT_TRUE(unknownMessages.empty());
+		});
+	}
+
+	TEST(TEST_CLASS, UnknownMessagesReturnsAllMessagesWithStepIdentifierNoLessThanFilterParameter) {
+		// Arrange:
+		RunUnknownMessagesTest([](const auto& aggregator, const auto& shortHashes) {
+			// Act:
+			auto unknownMessages = aggregator.view().unknownMessages({ 6, 4, 5 }, {});
+
+			// Assert:
+			EXPECT_EQ(4u, unknownMessages.size());
+			EXPECT_EQ(
+					utils::ShortHashesSet({ shortHashes[0], shortHashes[2], shortHashes[3], shortHashes[5] }),
+					ToShortHashes(unknownMessages));
+		});
+	}
+
+	namespace {
+		template<typename TAction>
+		void RunMaxResponseSizeTests(TAction action) {
+			// Arrange: determine message size from a generated message
+			MessagesBuilder messagesBuilder;
+			messagesBuilder.push({ 6, 4, 5 }, 100);
+			auto messageSize = messagesBuilder.message(0)->Size;
+
+			// Assert:
+			action(2, 3 * messageSize - 1);
+			action(3, 3 * messageSize);
+			action(3, 3 * messageSize + 1);
+
+			action(3, 4 * messageSize - 1);
+			action(4, 4 * messageSize);
+		}
+	}
+
+	TEST(TEST_CLASS, UnknownMessagesReturnsMessagesWithTotalSizeOfAtMostMaxResponseSize_AcrossSteps) {
+		// Arrange:
+		RunMaxResponseSizeTests([](auto numExpectedMessages, auto maxResponseSize) {
+			MessagesBuilder messagesBuilder;
+			messagesBuilder.push({ 6, 2, 1 }, 100);
+			messagesBuilder.push({ 6, 2, 2 }, 200);
+			messagesBuilder.push({ 6, 4, 3 }, 300);
+			messagesBuilder.push({ 6, 4, 4 }, 400);
+			messagesBuilder.push({ 6, 8, 5 }, 500);
+			messagesBuilder.push({ 6, 8, 6 }, 600);
+
+			auto shortHashes = ToShortHashes(messagesBuilder);
+
+			TestContext context(2000, 3000, maxResponseSize, messagesBuilder.createProcessor());
+			auto& aggregator = context.multiStepAggregator();
+
+			ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
+
+			// Act:
+			auto unknownMessages = aggregator.view().unknownMessages({ 6, 0, 0 }, {});
+
+			// Assert:
+			EXPECT_EQ(numExpectedMessages, unknownMessages.size());
+			EXPECT_EQ(
+					utils::ShortHashesSet(shortHashes.cbegin(), shortHashes.cbegin() + numExpectedMessages),
+					ToShortHashes(unknownMessages));
+		});
+	}
+
+	TEST(TEST_CLASS, UnknownMessagesReturnsMessagesWithTotalSizeOfAtMostMaxResponseSize_WithinStep) {
+		// Arrange:
+		RunMaxResponseSizeTests([](auto numExpectedMessages, auto maxResponseSize) {
+			MessagesBuilder messagesBuilder;
+			for (auto numVotes : std::initializer_list<uint64_t>{ 100, 200, 300, 400, 500, 600 })
+				messagesBuilder.push({ 6, 4, 5 }, numVotes);
+
+			auto shortHashes = ToShortHashes(messagesBuilder);
+			auto shortHashesSet = utils::ShortHashesSet(shortHashes.cbegin(), shortHashes.cend());
+
+			TestContext context(2000, 3000, maxResponseSize, messagesBuilder.createProcessor());
+			auto& aggregator = context.multiStepAggregator();
+
+			ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
+
+			// Act:
+			auto unknownMessages = aggregator.view().unknownMessages({ 6, 0, 0 }, {});
+
+			// Assert:
+			EXPECT_EQ(numExpectedMessages, unknownMessages.size());
+
+			// - cannot check unknownMessages exactly because there's no sorting for messages within a step
+			for (auto shortHash : ToShortHashes(unknownMessages))
+				EXPECT_CONTAINS(shortHashesSet, shortHash);
+		});
+	}
+
+	// endregion
+
+	// region synchronization
+
+	namespace {
+		auto CreateLockProvider() {
+			return std::make_unique<MultiStepFinalizationMessageAggregator>(
+					10'000,
+					MessageProcessor(),
+					SingleStepAggregatorFactory(),
+					ConsensusSink());
+		}
+	}
+
+	DEFINE_LOCK_PROVIDER_TESTS(TEST_CLASS)
 
 	// endregion
 }}

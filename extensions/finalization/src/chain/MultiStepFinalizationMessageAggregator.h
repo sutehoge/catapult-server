@@ -20,22 +20,61 @@
 
 #pragma once
 #include "FinalizationAggregatorTypes.h"
+#include "catapult/utils/SpinReaderWriterLock.h"
 #include <map>
+
+namespace catapult {
+	namespace chain {
+		struct MultiStepFinalizationMessageAggregatorState;
+		struct StepDataTuple;
+	}
+}
 
 namespace catapult { namespace chain {
 
-	/// Aggregates finalization messages across multiple steps until consensus is reached.
-	class MultiStepFinalizationMessageAggregator {
+	// region MultiStepFinalizationMessageAggregatorView
+
+	/// Read only view on top of multi step finalization message aggregator.
+	class MultiStepFinalizationMessageAggregatorView : utils::MoveOnly {
+	private:
+		using UnknownMessages = std::vector<std::shared_ptr<const model::FinalizationMessage>>;
+
 	public:
-		/// Creates an aggregator around \a messageProcessor, \a aggregatorFactory and \a consensusSink.
-		MultiStepFinalizationMessageAggregator(
-				const MessageProcessor& messageProcessor,
-				const SingleStepAggregatorFactory& aggregatorFactory,
-				const ConsensusSink& consensusSink);
+		/// Creates a view around \a state with lock context \a readLock.
+		MultiStepFinalizationMessageAggregatorView(
+				const MultiStepFinalizationMessageAggregatorState& state,
+				utils::SpinReaderWriterLock::ReaderLockGuard&& readLock);
 
 	public:
 		/// Gets the number of step identifiers currently tracked.
 		size_t size() const;
+
+		/// Gets the minimum step identifier that is currently tracked.
+		const crypto::StepIdentifier& minStepIdentifier() const;
+
+		/// Gets a range of short hashes of all messages in the cache.
+		/// \note Each short hash consists of the first 4 bytes of the complete hash.
+		model::ShortHashRange shortHashes() const;
+
+		/// Gets all finalization messages starting at \a stepIdentifier that do not have a short hash in \a knownShortHashes.
+		UnknownMessages unknownMessages(const crypto::StepIdentifier& stepIdentifier, const utils::ShortHashesSet& knownShortHashes) const;
+
+	private:
+		const MultiStepFinalizationMessageAggregatorState& m_state;
+		utils::SpinReaderWriterLock::ReaderLockGuard m_readLock;
+	};
+
+	// endregion
+
+	// region MultiStepFinalizationMessageAggregatorModifier
+
+	/// Write only view on top of multi step finalization message aggregator.
+	class MultiStepFinalizationMessageAggregatorModifier : utils::MoveOnly {
+	public:
+		/// Creates a view around \a state with lock context \a writeLock.
+		MultiStepFinalizationMessageAggregatorModifier(
+				MultiStepFinalizationMessageAggregatorState& state,
+				utils::SpinReaderWriterLock::WriterLockGuard&& writeLock);
 
 	public:
 		/// Sets the next finalization \a point.
@@ -47,12 +86,6 @@ namespace catapult { namespace chain {
 		void add(const std::shared_ptr<model::FinalizationMessage>& pMessage);
 
 	private:
-		struct StepDataTuple {
-			std::unique_ptr<SingleStepFinalizationMessageAggregator> pAggregator;
-			FinalizationProof Proof;
-		};
-
-	private:
 		bool canAccept(const crypto::StepIdentifier& stepIdentifier);
 
 		std::pair<uint64_t, bool> process(const model::FinalizationMessage& message);
@@ -60,12 +93,38 @@ namespace catapult { namespace chain {
 		bool add(StepDataTuple& stepDataTuple, const model::FinalizationMessage& message, uint64_t numVotes);
 
 	private:
-		MessageProcessor m_messageProcessor;
-		SingleStepAggregatorFactory m_aggregatorFactory;
-		ConsensusSink m_consensusSink;
-
-		crypto::StepIdentifier m_minStepIdentier;
-		FinalizationPoint m_nextFinalizationPoint;
-		std::map<crypto::StepIdentifier, StepDataTuple> m_stepDataTuplesMap;
+		MultiStepFinalizationMessageAggregatorState& m_state;
+		utils::SpinReaderWriterLock::WriterLockGuard m_writeLock;
 	};
+
+	// endregion
+
+	// region MultiStepFinalizationMessageAggregator
+
+	/// Aggregates finalization messages across multiple steps until consensus is reached.
+	class MultiStepFinalizationMessageAggregator {
+	public:
+		/// Creates an aggregator around \a maxResponseSize, \a messageProcessor, \a aggregatorFactory and \a consensusSink.
+		MultiStepFinalizationMessageAggregator(
+				uint64_t maxResponseSize,
+				const MessageProcessor& messageProcessor,
+				const SingleStepAggregatorFactory& aggregatorFactory,
+				const ConsensusSink& consensusSink);
+
+		/// Destroys the aggregator.
+		~MultiStepFinalizationMessageAggregator();
+
+	public:
+		/// Gets a read only view of the aggregator.
+		MultiStepFinalizationMessageAggregatorView view() const;
+
+		/// Gets a write only view of the aggregator.
+		MultiStepFinalizationMessageAggregatorModifier modifier();
+
+	private:
+		std::unique_ptr<MultiStepFinalizationMessageAggregatorState> m_pState;
+		mutable utils::SpinReaderWriterLock m_lock;
+	};
+
+	// endregion
 }}

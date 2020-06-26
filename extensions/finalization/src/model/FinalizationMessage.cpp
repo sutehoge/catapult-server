@@ -56,6 +56,12 @@ namespace catapult { namespace model {
 		}
 	}
 
+	Hash256 CalculateMessageHash(const FinalizationMessage& message) {
+		Hash256 messageHash;
+		crypto::Sha3_256(ToBuffer(message), messageHash);
+		return messageHash;
+	}
+
 	// TODO: FinalizationContext::lookup expects BLS key, but, for now, interpret it as ED25519 key
 
 	std::unique_ptr<FinalizationMessage> PrepareMessage(

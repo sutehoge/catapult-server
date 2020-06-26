@@ -24,6 +24,7 @@
 #include "catapult/crypto_voting/OtsTree.h"
 #include "catapult/utils/MemoryUtils.h"
 #include "tests/test/cache/AccountStateCacheTestUtils.h"
+#include "tests/test/core/EntityTestUtils.h"
 #include "tests/test/core/HashTestUtils.h"
 #include "tests/test/core/VariableSizedEntityTestUtils.h"
 #include "tests/test/core/mocks/MockMemoryStream.h"
@@ -42,13 +43,9 @@ namespace catapult { namespace model {
 		std::unique_ptr<FinalizationMessage> CreateMessage(uint32_t numHashes) {
 			uint32_t messageSize = sizeof(FinalizationMessage) + numHashes * Hash256::Size;
 			auto pMessage = utils::MakeUniqueWithSize<FinalizationMessage>(messageSize);
+			test::FillWithRandomData({ reinterpret_cast<uint8_t*>(pMessage.get()), messageSize });
 			pMessage->Size = messageSize;
 			pMessage->HashesCount = numHashes;
-
-			test::FillWithRandomData({
-				reinterpret_cast<uint8_t*>(pMessage->HashesPtr()),
-				numHashes * Hash256::Size
-			});
 			return pMessage;
 		}
 
@@ -129,6 +126,38 @@ namespace catapult { namespace model {
 	}
 
 	DEFINE_ATTACHMENT_POINTER_TESTS(TEST_CLASS, FinalizationMessageTraits) // HashesPtr
+
+	// endregion
+
+	// region CalculateMessageHash
+
+	TEST(TEST_CLASS, CalculateMessageHash_ProducesDifferentHashesForMessagesWithDifferentBodyContents) {
+		// Arrange:
+		auto pMessage1 = CreateMessage(3);
+		auto pMessage2 = test::CopyEntity(*pMessage1);
+		++pMessage2->StepIdentifier.SubRound;
+
+		// Act:
+		auto messageHash1 = CalculateMessageHash(*pMessage1);
+		auto messageHash2 = CalculateMessageHash(*pMessage2);
+
+		// Assert:
+		EXPECT_NE(messageHash1, messageHash2);
+	}
+
+	TEST(TEST_CLASS, CalculateMessageHash_ProducesSameHashForMessagesWithDifferentHeaderContents) {
+		// Arrange:
+		auto pMessage1 = CreateMessage(3);
+		auto pMessage2 = test::CopyEntity(*pMessage1);
+		test::FillWithRandomData(pMessage2->Signature);
+
+		// Act:
+		auto messageHash1 = CalculateMessageHash(*pMessage1);
+		auto messageHash2 = CalculateMessageHash(*pMessage2);
+
+		// Assert:
+		EXPECT_EQ(messageHash1, messageHash2);
+	}
 
 	// endregion
 

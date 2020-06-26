@@ -22,33 +22,121 @@
 
 namespace catapult { namespace chain {
 
-	MultiStepFinalizationMessageAggregator::MultiStepFinalizationMessageAggregator(
-			const MessageProcessor& messageProcessor,
-			const SingleStepAggregatorFactory& aggregatorFactory,
-			const ConsensusSink& consensusSink)
-			: m_messageProcessor(messageProcessor)
-			, m_aggregatorFactory(aggregatorFactory)
-			, m_consensusSink(consensusSink)
-			, m_minStepIdentier({ 0, 0, 0 })
+	// region StepDataTuple / MultiStepFinalizationMessageAggregatorState
+
+	struct StepDataTuple {
+		std::unique_ptr<SingleStepFinalizationMessageAggregator> pAggregator;
+		FinalizationProof Proof;
+	};
+
+	struct MultiStepFinalizationMessageAggregatorState {
+	public:
+		MultiStepFinalizationMessageAggregatorState(
+				uint64_t maxResponseSize,
+				const MessageProcessor& messageProcessor,
+				const SingleStepAggregatorFactory& aggregatorFactory,
+				const ConsensusSink& consensusSink)
+				: MaxResponseSize(maxResponseSize)
+				, MessageProcessor(messageProcessor)
+				, AggregatorFactory(aggregatorFactory)
+				, ConsensusSink(consensusSink)
+				, MinStepIdentifier({ 0, 0, 0 })
+		{}
+
+	public:
+		uint64_t MaxResponseSize;
+		chain::MessageProcessor MessageProcessor;
+		SingleStepAggregatorFactory AggregatorFactory;
+		chain::ConsensusSink ConsensusSink;
+
+		crypto::StepIdentifier MinStepIdentifier;
+		FinalizationPoint NextFinalizationPoint;
+		std::map<crypto::StepIdentifier, StepDataTuple> StepDataTuplesMap;
+	};
+
+	// endregion
+
+	// region MultiStepFinalizationMessageAggregatorView
+
+	MultiStepFinalizationMessageAggregatorView::MultiStepFinalizationMessageAggregatorView(
+			const MultiStepFinalizationMessageAggregatorState& state,
+			utils::SpinReaderWriterLock::ReaderLockGuard&& readLock)
+			: m_state(state)
+			, m_readLock(std::move(readLock))
 	{}
 
-	size_t MultiStepFinalizationMessageAggregator::size() const {
-		return m_stepDataTuplesMap.size();
+	size_t MultiStepFinalizationMessageAggregatorView::size() const {
+		return m_state.StepDataTuplesMap.size();
 	}
 
-	void MultiStepFinalizationMessageAggregator::setNextFinalizationPoint(FinalizationPoint point) {
-		if (point < m_nextFinalizationPoint)
-			CATAPULT_THROW_INVALID_ARGUMENT_1("cannot set finalization point to lower value", m_nextFinalizationPoint);
+	const crypto::StepIdentifier& MultiStepFinalizationMessageAggregatorView::minStepIdentifier() const {
+		return m_state.MinStepIdentifier;
+	}
 
-		if (m_nextFinalizationPoint == point)
+	model::ShortHashRange MultiStepFinalizationMessageAggregatorView::shortHashes() const {
+		auto numMessages = 0u;
+		for (const auto& stepDataTuplesPair : m_state.StepDataTuplesMap)
+			numMessages += stepDataTuplesPair.second.Proof.size();
+
+		auto shortHashes = model::EntityRange<utils::ShortHash>::PrepareFixed(numMessages);
+		auto shortHashesIter = shortHashes.begin();
+		for (const auto& stepDataTuplesPair : m_state.StepDataTuplesMap) {
+			for (const auto& pMessage : stepDataTuplesPair.second.Proof)
+				*shortHashesIter++ = utils::ToShortHash(model::CalculateMessageHash(*pMessage));
+		}
+
+		return shortHashes;
+	}
+
+	MultiStepFinalizationMessageAggregatorView::UnknownMessages MultiStepFinalizationMessageAggregatorView::unknownMessages(
+			const crypto::StepIdentifier& stepIdentifier,
+			const utils::ShortHashesSet& knownShortHashes) const {
+		uint64_t totalSize = 0;
+		UnknownMessages messages;
+		for (const auto& stepDataTuplesPair : m_state.StepDataTuplesMap) {
+			if (stepDataTuplesPair.first < stepIdentifier)
+				continue;
+
+			for (const auto& pMessage : stepDataTuplesPair.second.Proof) {
+				auto shortHash = utils::ToShortHash(model::CalculateMessageHash(*pMessage));
+				auto iter = knownShortHashes.find(shortHash);
+				if (knownShortHashes.cend() == iter) {
+					totalSize += pMessage->Size;
+					if (totalSize > m_state.MaxResponseSize)
+						return messages;
+
+					messages.push_back(pMessage);
+				}
+			}
+		}
+
+		return messages;
+	}
+
+	// endregion
+
+	// region MultiStepFinalizationMessageAggregatorModifier
+
+	MultiStepFinalizationMessageAggregatorModifier::MultiStepFinalizationMessageAggregatorModifier(
+			MultiStepFinalizationMessageAggregatorState& state,
+			utils::SpinReaderWriterLock::WriterLockGuard&& writeLock)
+			: m_state(state)
+			, m_writeLock(std::move(writeLock))
+	{}
+
+	void MultiStepFinalizationMessageAggregatorModifier::setNextFinalizationPoint(FinalizationPoint point) {
+		if (point < m_state.NextFinalizationPoint)
+			CATAPULT_THROW_INVALID_ARGUMENT_1("cannot set finalization point to lower value", m_state.NextFinalizationPoint);
+
+		if (m_state.NextFinalizationPoint == point)
 			return;
 
-		m_minStepIdentier = { point.unwrap(), 0, 0 };
-		m_nextFinalizationPoint = point;
-		m_stepDataTuplesMap.clear();
+		m_state.MinStepIdentifier = { point.unwrap(), 0, 0 };
+		m_state.NextFinalizationPoint = point;
+		m_state.StepDataTuplesMap.clear();
 	}
 
-	void MultiStepFinalizationMessageAggregator::add(const std::shared_ptr<model::FinalizationMessage>& pMessage) {
+	void MultiStepFinalizationMessageAggregatorModifier::add(const std::shared_ptr<model::FinalizationMessage>& pMessage) {
 		const auto& stepIdentifier = pMessage->StepIdentifier;
 		if (!canAccept(stepIdentifier))
 			return;
@@ -57,27 +145,27 @@ namespace catapult { namespace chain {
 		if (!processResultPair.second)
 			return;
 
-		auto iter = m_stepDataTuplesMap.find(stepIdentifier);
-		if (m_stepDataTuplesMap.end() == iter) {
-			iter = m_stepDataTuplesMap.emplace(stepIdentifier, StepDataTuple()).first;
-			iter->second.pAggregator = m_aggregatorFactory(pMessage->StepIdentifier);
+		auto iter = m_state.StepDataTuplesMap.find(stepIdentifier);
+		if (m_state.StepDataTuplesMap.end() == iter) {
+			iter = m_state.StepDataTuplesMap.emplace(stepIdentifier, StepDataTuple()).first;
+			iter->second.pAggregator = m_state.AggregatorFactory(pMessage->StepIdentifier);
 		}
 
 		iter->second.Proof.push_back(pMessage);
 
 		if (add(iter->second, *pMessage, processResultPair.first)) {
 			// new consensus was reached, so drop older messages
-			m_minStepIdentier = iter->first;
-			m_stepDataTuplesMap.erase(m_stepDataTuplesMap.begin(), iter);
+			m_state.MinStepIdentifier = iter->first;
+			m_state.StepDataTuplesMap.erase(m_state.StepDataTuplesMap.begin(), iter);
 		}
 	}
 
-	bool MultiStepFinalizationMessageAggregator::canAccept(const crypto::StepIdentifier& stepIdentifier) {
+	bool MultiStepFinalizationMessageAggregatorModifier::canAccept(const crypto::StepIdentifier& stepIdentifier) {
 		// only accept messages for the current FP that are no less than the min consensus step
-		return m_nextFinalizationPoint == FinalizationPoint(stepIdentifier.Point) && stepIdentifier >= m_minStepIdentier;
+		return m_state.NextFinalizationPoint == FinalizationPoint(stepIdentifier.Point) && stepIdentifier >= m_state.MinStepIdentifier;
 	}
 
-	bool MultiStepFinalizationMessageAggregator::add(
+	bool MultiStepFinalizationMessageAggregatorModifier::add(
 			StepDataTuple& stepDataTuple,
 			const model::FinalizationMessage& message,
 			uint64_t numVotes) {
@@ -85,12 +173,12 @@ namespace catapult { namespace chain {
 		if (!stepDataTuple.pAggregator->hasConsensus())
 			return false;
 
-		m_consensusSink(message.StepIdentifier, stepDataTuple.pAggregator->consensusHash(), stepDataTuple.Proof);
+		m_state.ConsensusSink(message.StepIdentifier, stepDataTuple.pAggregator->consensusHash(), stepDataTuple.Proof);
 		return true;
 	}
 
-	std::pair<uint64_t, bool> MultiStepFinalizationMessageAggregator::process(const model::FinalizationMessage& message) {
-		auto processResultPair = m_messageProcessor(message);
+	std::pair<uint64_t, bool> MultiStepFinalizationMessageAggregatorModifier::process(const model::FinalizationMessage& message) {
+		auto processResultPair = m_state.MessageProcessor(message);
 		if (model::ProcessMessageResult::Success != processResultPair.first) {
 			CATAPULT_LOG(warning) << "rejecting finalization message with result " << processResultPair.first;
 			return std::make_pair(0, false);
@@ -98,4 +186,34 @@ namespace catapult { namespace chain {
 
 		return std::make_pair(processResultPair.second, true);
 	}
+
+	// endregion
+
+	// region MultiStepFinalizationMessageAggregator
+
+	MultiStepFinalizationMessageAggregator::MultiStepFinalizationMessageAggregator(
+			uint64_t maxResponseSize,
+			const MessageProcessor& messageProcessor,
+			const SingleStepAggregatorFactory& aggregatorFactory,
+			const ConsensusSink& consensusSink)
+			: m_pState(std::make_unique<MultiStepFinalizationMessageAggregatorState>(
+					maxResponseSize,
+					messageProcessor,
+					aggregatorFactory,
+					consensusSink))
+	{}
+
+	MultiStepFinalizationMessageAggregator::~MultiStepFinalizationMessageAggregator() = default;
+
+	MultiStepFinalizationMessageAggregatorView MultiStepFinalizationMessageAggregator::view() const {
+		auto readLock = m_lock.acquireReader();
+		return MultiStepFinalizationMessageAggregatorView(*m_pState, std::move(readLock));
+	}
+
+	MultiStepFinalizationMessageAggregatorModifier MultiStepFinalizationMessageAggregator::modifier() {
+		auto writeLock = m_lock.acquireWriter();
+		return MultiStepFinalizationMessageAggregatorModifier(*m_pState, std::move(writeLock));
+	}
+
+	// endregion
 }}

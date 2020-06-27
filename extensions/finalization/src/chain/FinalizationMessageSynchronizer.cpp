@@ -33,35 +33,32 @@ namespace catapult { namespace chain {
 
 		public:
 			FinalizationMessageTraits(
-					const StepIdentifierSupplier& stepIdentifierSupplier,
-					const ShortHashesSupplier& shortHashesSupplier,
+					const FinalizationMessageSynchronizerFilterSupplier& messageFilterSupplier,
 					const handlers::MessageRangeHandler& messageRangeConsumer)
-					: m_stepIdentifierSupplier(stepIdentifierSupplier)
-					, m_shortHashesSupplier(shortHashesSupplier)
+					: m_messageFilterSupplier(messageFilterSupplier)
 					, m_messageRangeConsumer(messageRangeConsumer)
 			{}
 
 		public:
-			thread::future<api::FinalizationMessageRange> apiCall(const RemoteApiType& api) const {
-				return api.messages(m_stepIdentifierSupplier(), m_shortHashesSupplier());
+			thread::future<model::FinalizationMessageRange> apiCall(const RemoteApiType& api) const {
+				auto filter = m_messageFilterSupplier();
+				return api.messages(filter.first, std::move(filter.second));
 			}
 
-			void consume(api::FinalizationMessageRange&& range, const model::NodeIdentity& sourceIdentity) const {
+			void consume(model::FinalizationMessageRange&& range, const model::NodeIdentity& sourceIdentity) const {
 				m_messageRangeConsumer(model::AnnotatedEntityRange<model::FinalizationMessage>(std::move(range), sourceIdentity));
 			}
 
 		private:
-			StepIdentifierSupplier m_stepIdentifierSupplier;
-			ShortHashesSupplier m_shortHashesSupplier;
+			FinalizationMessageSynchronizerFilterSupplier m_messageFilterSupplier;
 			handlers::MessageRangeHandler m_messageRangeConsumer;
 		};
 	}
 
 	RemoteNodeSynchronizer<api::RemoteFinalizationApi> CreateFinalizationMessageSynchronizer(
-			const StepIdentifierSupplier& stepIdentifierSupplier,
-			const ShortHashesSupplier& shortHashesSupplier,
+			const FinalizationMessageSynchronizerFilterSupplier& messageFilterSupplier,
 			const handlers::MessageRangeHandler& messageRangeConsumer) {
-		auto traits = FinalizationMessageTraits(stepIdentifierSupplier, shortHashesSupplier, messageRangeConsumer);
+		auto traits = FinalizationMessageTraits(messageFilterSupplier, messageRangeConsumer);
 		auto pSynchronizer = std::make_shared<EntitiesSynchronizer<FinalizationMessageTraits>>(std::move(traits));
 		return CreateRemoteNodeSynchronizer(pSynchronizer);
 	}

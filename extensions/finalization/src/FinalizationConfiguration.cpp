@@ -37,7 +37,10 @@ namespace catapult { namespace finalization {
 		LOAD_PROPERTY(Size);
 		LOAD_PROPERTY(Threshold);
 
-		utils::VerifyBagSizeLte(bag, 2);
+		LOAD_PROPERTY(ShortLivedCacheMessageDuration);
+		LOAD_PROPERTY(MessageSynchronizationMaxResponseSize);
+
+		utils::VerifyBagSizeLte(bag, 4);
 		return config;
 	}
 

@@ -31,7 +31,7 @@ namespace catapult { namespace api {
 
 		struct MessagesTraits {
 		public:
-			using ResultType = FinalizationMessageRange;
+			using ResultType = model::FinalizationMessageRange;
 			static constexpr auto Packet_Type = ionet::PacketType::Pull_Finalization_Messages;
 			static constexpr auto Friendly_Name = "pull finalization messages";
 

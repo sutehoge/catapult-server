@@ -22,6 +22,7 @@
 #include "FinalizationBootstrapperService.h"
 #include "finalization/src/api/RemoteFinalizationApi.h"
 #include "finalization/src/chain/FinalizationMessageSynchronizer.h"
+#include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
 #include "catapult/config/CatapultKeys.h"
 #include "catapult/extensions/NetworkUtils.h"
 #include "catapult/extensions/PeersConnectionTasks.h"
@@ -34,7 +35,7 @@
 namespace catapult { namespace finalization {
 
 	namespace {
-		constexpr auto Service_Name = "finalization";
+		constexpr auto Service_Name = "fin.writers";
 		constexpr auto Service_Id = ionet::ServiceIdentifier(0x50415254);
 
 		thread::Task CreateConnectPeersTask(extensions::ServiceState& state, net::PacketWriters& packetWriters) {
@@ -62,12 +63,13 @@ namespace catapult { namespace finalization {
 				extensions::ServiceLocator& locator,
 				const extensions::ServiceState& state,
 				net::PacketWriters& packetWriters) {
+			const auto& multiStepAggregator = GetMultiStepFinalizationMessageAggregator(locator);
 			const auto& serverHooks = GetFinalizationServerHooks(locator);
 			auto finalizationMessageSynchronizer = chain::CreateFinalizationMessageSynchronizer(
-					// TODO: retreive realistic values for these; this implies MultiStepAggregator needs RW semantics either directly
-					//       or indirectly (via a BlockStorageCache-like wrapper)
-					[]() { return crypto::StepIdentifier(); },
-					[]() { return model::ShortHashRange(); },
+					[&multiStepAggregator]() {
+						auto multiStepAggregatorView = multiStepAggregator.view();
+						return std::make_pair(multiStepAggregatorView.minStepIdentifier(), multiStepAggregatorView.shortHashes());
+					},
 					serverHooks.messageRangeConsumer());
 
 			thread::Task task;

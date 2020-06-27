@@ -19,7 +19,7 @@
 **/
 
 #include "finalization/src/FinalizationService.h"
-#include "finalization/src/FinalizationBootstrapperService.h"
+#include "finalization/tests/test/FinalizationBootstrapperServiceTestUtils.h"
 #include "tests/test/core/PacketTestUtils.h"
 #include "tests/test/local/PacketWritersServiceTestUtils.h"
 #include "tests/test/local/ServiceTestUtils.h"
@@ -33,28 +33,19 @@ namespace catapult { namespace finalization {
 
 	namespace {
 		constexpr auto Num_Expected_Tasks = 2u;
+		constexpr auto Num_Dependent_Services = test::FinalizationBootstrapperServiceTestUtils::Num_Bootstrapper_Services;
 
 		struct FinalizationServiceTraits {
 			static constexpr auto Counter_Name = "FIN WRITERS";
-			static constexpr auto Num_Expected_Services = 2u; // writers (1) + dependent services (1)
+			static constexpr auto Num_Expected_Services = 1 + Num_Dependent_Services; // writers (1) + dependent services
 			static constexpr auto CreateRegistrar = CreateFinalizationServiceRegistrar;
 
 			static auto GetWriters(const extensions::ServiceLocator& locator) {
-				return locator.service<net::PacketWriters>("finalization");
+				return locator.service<net::PacketWriters>("fin.writers");
 			}
 		};
 
-		class TestContext : public test::ServiceLocatorTestContext<FinalizationServiceTraits> {
-		public:
-			TestContext() {
-				// Arrange: register service dependencies
-				auto pBootstrapperRegistrar = CreateFinalizationBootstrapperServiceRegistrar();
-				pBootstrapperRegistrar->registerServices(locator(), testState().state());
-
-				// - register hook dependencies
-				GetFinalizationServerHooks(locator()).setMessageRangeConsumer([](auto&&) {});
-			}
-		};
+		using TestContext = test::MessageRangeConsumerDependentServiceLocatorTestContext<FinalizationServiceTraits>;
 
 		struct Mixin {
 			using TraitsType = FinalizationServiceTraits;

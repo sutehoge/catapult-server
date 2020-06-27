@@ -36,7 +36,10 @@ namespace catapult { namespace finalization {
 						"finalization",
 						{
 							{ "size", "987" },
-							{ "threshold", "579" }
+							{ "threshold", "579" },
+
+							{ "shortLivedCacheMessageDuration", "53m" },
+							{ "messageSynchronizationMaxResponseSize", "234KB" }
 						}
 					}
 				};
@@ -50,12 +53,18 @@ namespace catapult { namespace finalization {
 				// Assert:
 				EXPECT_EQ(0u, config.Size);
 				EXPECT_EQ(0u, config.Threshold);
+
+				EXPECT_EQ(utils::TimeSpan(), config.ShortLivedCacheMessageDuration);
+				EXPECT_EQ(utils::FileSize(), config.MessageSynchronizationMaxResponseSize);
 			}
 
 			static void AssertCustom(const FinalizationConfiguration& config) {
 				// Assert:
 				EXPECT_EQ(987u, config.Size);
 				EXPECT_EQ(579u, config.Threshold);
+
+				EXPECT_EQ(utils::TimeSpan::FromMinutes(53), config.ShortLivedCacheMessageDuration);
+				EXPECT_EQ(utils::FileSize::FromKilobytes(234), config.MessageSynchronizationMaxResponseSize);
 			}
 		};
 	}
@@ -76,6 +85,9 @@ namespace catapult { namespace finalization {
 		// Assert:
 		EXPECT_EQ(10'000u, config.Size);
 		EXPECT_EQ(7'750u, config.Threshold);
+
+		EXPECT_EQ(utils::TimeSpan::FromMinutes(10), config.ShortLivedCacheMessageDuration);
+		EXPECT_EQ(utils::FileSize::FromMegabytes(20), config.MessageSynchronizationMaxResponseSize);
 	}
 
 	// endregion

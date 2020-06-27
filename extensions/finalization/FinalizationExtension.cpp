@@ -20,6 +20,7 @@
 
 #include "src/FinalizationBootstrapperService.h"
 #include "src/FinalizationConfiguration.h"
+#include "src/FinalizationMessageProcessingService.h"
 #include "src/FinalizationService.h"
 #include "src/FinalizationSyncSourceService.h"
 #include "catapult/config/ConfigurationFileLoader.h"
@@ -30,11 +31,12 @@ namespace catapult { namespace finalization {
 	namespace {
 		void RegisterExtension(extensions::ProcessBootstrapper& bootstrapper) {
 			const auto& resourcesPath = bootstrapper.resourcesPath();
-			/* auto config = */ FinalizationConfiguration::LoadFromPath(resourcesPath);
+			auto config = FinalizationConfiguration::LoadFromPath(resourcesPath);
 
 			// register other services
 			auto& extensionManager = bootstrapper.extensionManager();
-			extensionManager.addServiceRegistrar(CreateFinalizationBootstrapperServiceRegistrar());
+			extensionManager.addServiceRegistrar(CreateFinalizationBootstrapperServiceRegistrar(config));
+			extensionManager.addServiceRegistrar(CreateFinalizationMessageProcessingServiceRegistrar(config));
 			extensionManager.addServiceRegistrar(CreateFinalizationServiceRegistrar());
 			extensionManager.addServiceRegistrar(CreateFinalizationSyncSourceServiceRegistrar());
 		}

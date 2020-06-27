@@ -35,9 +35,9 @@ namespace catapult { namespace mocks {
 
 	public:
 		/// Creates a finalization api around a range of messages (\a messageRange).
-		explicit MockFinalizationApi(const api::FinalizationMessageRange& messageRange)
+		explicit MockFinalizationApi(const model::FinalizationMessageRange& messageRange)
 				: api::RemoteFinalizationApi({ test::GenerateRandomByteArray<Key>(), "fake-host-from-mock-finalization-api" })
-				, m_messageRange(api::FinalizationMessageRange::CopyRange(messageRange))
+				, m_messageRange(model::FinalizationMessageRange::CopyRange(messageRange))
 				, m_errorEntryPoint(EntryPoint::None)
 		{}
 
@@ -55,14 +55,14 @@ namespace catapult { namespace mocks {
 	public:
 		/// Gets the configured messages and throws if the error entry point is set to Messages.
 		/// \note The \a stepIdentifier and \a knownShortHashes parameters are captured.
-		thread::future<api::FinalizationMessageRange> messages(
+		thread::future<model::FinalizationMessageRange> messages(
 				const crypto::StepIdentifier& stepIdentifier,
 				model::ShortHashRange&& knownShortHashes) const override {
 			m_messagesRequests.emplace_back(stepIdentifier, std::move(knownShortHashes));
 			if (shouldRaiseException(EntryPoint::Messages))
-				return CreateFutureException<api::FinalizationMessageRange>("messages error has been set");
+				return CreateFutureException<model::FinalizationMessageRange>("messages error has been set");
 
-			return thread::make_ready_future(api::FinalizationMessageRange::CopyRange(m_messageRange));
+			return thread::make_ready_future(model::FinalizationMessageRange::CopyRange(m_messageRange));
 		}
 
 	private:
@@ -76,7 +76,7 @@ namespace catapult { namespace mocks {
 		}
 
 	private:
-		api::FinalizationMessageRange m_messageRange;
+		model::FinalizationMessageRange m_messageRange;
 		EntryPoint m_errorEntryPoint;
 		mutable std::vector<std::pair<crypto::StepIdentifier, model::ShortHashRange>> m_messagesRequests;
 	};

@@ -50,7 +50,7 @@ namespace catapult { namespace chain {
 		size_t size() const;
 
 		/// Gets the minimum step identifier that is currently tracked.
-		const crypto::StepIdentifier& minStepIdentifier() const;
+		crypto::StepIdentifier minStepIdentifier() const;
 
 		/// Gets a range of short hashes of all messages in the cache.
 		/// \note Each short hash consists of the first 4 bytes of the complete hash.

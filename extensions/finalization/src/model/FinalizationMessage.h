@@ -31,12 +31,12 @@ namespace catapult {
 
 namespace catapult { namespace model {
 
-#pragma pack(push, 1)
-
 	// region FinalizationMessage
 
+#pragma pack(push, 1)
+
 	/// Finalization message.
-	struct FinalizationMessage : public model::TrailingVariableDataLayout<FinalizationMessage, Hash256> {
+	struct FinalizationMessage : public TrailingVariableDataLayout<FinalizationMessage, Hash256> {
 	public:
 		/// Size of the header that can be skipped when signing/verifying.
 		static constexpr size_t Header_Size = sizeof(uint32_t) * 2 + sizeof(crypto::OtsTreeSignature);
@@ -72,9 +72,12 @@ namespace catapult { namespace model {
 		}
 	};
 
-	// endregion
-
 #pragma pack(pop)
+
+	/// Range of finalization messages.
+	using FinalizationMessageRange = EntityRange<FinalizationMessage>;
+
+	// endregion
 
 	// region CalculateMessageHash
 
@@ -91,7 +94,7 @@ namespace catapult { namespace model {
 			crypto::OtsTree& otsTree,
 			const crypto::KeyPair& vrfKeyPair,
 			const crypto::StepIdentifier& stepIdentifier,
-			const model::HashRange& hashes,
+			const HashRange& hashes,
 			const FinalizationContext& context);
 
 	// endregion

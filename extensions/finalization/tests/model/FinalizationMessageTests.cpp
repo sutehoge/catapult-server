@@ -22,7 +22,7 @@
 #include "finalization/src/model/FinalizationContext.h"
 #include "catapult/cache_core/AccountStateCache.h"
 #include "catapult/crypto_voting/OtsTree.h"
-#include "catapult/utils/MemoryUtils.h"
+#include "finalization/tests/test/FinalizationMessageTestUtils.h"
 #include "tests/test/cache/AccountStateCacheTestUtils.h"
 #include "tests/test/core/EntityTestUtils.h"
 #include "tests/test/core/HashTestUtils.h"
@@ -58,7 +58,7 @@ namespace catapult { namespace model {
 
 	TEST(TEST_CLASS, FinalizationMessageHasExpectedSize) {
 		// Arrange:
-		auto expectedSize = sizeof(model::TrailingVariableDataLayout<FinalizationMessage, Hash256>);
+		auto expectedSize = sizeof(TrailingVariableDataLayout<FinalizationMessage, Hash256>);
 
 #define FIELD(X) expectedSize += sizeof(FinalizationMessage::X);
 		MESSAGE_FIELDS
@@ -178,49 +178,14 @@ namespace catapult { namespace model {
 			return config;
 		}
 
-		struct AccountKeyPairContainer {
-		public:
-			AccountKeyPairContainer(crypto::KeyPair&& vrfKeyPair, crypto::KeyPair&& votingKeyPair)
-					: VrfKeyPair(std::move(vrfKeyPair))
-					, VotingKeyPair(std::move(votingKeyPair))
-					, VrfPublicKey(VrfKeyPair.publicKey())
-					, VotingPublicKey(VotingKeyPair.publicKey().copyTo<VotingKey>())
-			{}
-
-		public:
-			crypto::KeyPair VrfKeyPair;
-			crypto::KeyPair VotingKeyPair;
-
-			Key VrfPublicKey;
-			VotingKey VotingPublicKey;
-		};
-
-		std::vector<AccountKeyPairContainer> AddAccountsWithBalances(
+		std::vector<test::AccountKeyPairDescriptor> AddAccountsWithBalances(
 				cache::AccountStateCache& cache,
 				Height height,
 				const std::vector<Amount>& balances) {
-			std::vector<AccountKeyPairContainer> keyPairContainers;
-
 			auto delta = cache.createDelta();
-			for (auto balance : balances) {
-				keyPairContainers.emplace_back(test::GenerateKeyPair(), test::GenerateKeyPair());
-
-				auto address = test::GenerateRandomByteArray<Address>();
-				delta->addAccount(address, height);
-				auto& accountState = delta->find(address).get();
-				accountState.SupplementalPublicKeys.vrf().set(keyPairContainers.back().VrfPublicKey);
-				accountState.SupplementalPublicKeys.voting().add({
-					keyPairContainers.back().VotingPublicKey,
-					FinalizationPoint(1),
-					FinalizationPoint(100)
-				});
-				accountState.Balances.credit(Harvesting_Mosaic_Id, balance);
-			}
-
-			delta->updateHighValueAccounts(height);
+			auto keyPairDescriptors = test::AddAccountsWithBalances(*delta, height, Harvesting_Mosaic_Id, balances);
 			cache.commit();
-
-			return keyPairContainers;
+			return keyPairDescriptors;
 		}
 
 		enum class VoterType : uint32_t { Small, Large, Ineligible };
@@ -236,14 +201,14 @@ namespace catapult { namespace model {
 			auto config = CreateConfigurationWithSize(3'000);
 
 			cache::AccountStateCache cache(cache::CacheConfiguration(), CreateOptions());
-			auto keyPairContainers = AddAccountsWithBalances(cache, Height(123), {
+			auto keyPairDescriptors = AddAccountsWithBalances(cache, Height(123), {
 				Amount(2'000'000), Amount(4'000'000'000'000), Amount(1'000'000), Amount(6'000'000'000'000)
 			});
 
 			FinalizationContext context(FinalizationPoint(50), Height(123), generationHash, config, *cache.createView());
 
 			// Act + Assert:
-			action(context, keyPairContainers);
+			action(context, keyPairDescriptors);
 		}
 
 		// endregion
@@ -255,12 +220,12 @@ namespace catapult { namespace model {
 		template<typename TAction>
 		void RunPrepareMessageTest(VoterType voterType, uint32_t numHashes, TAction action) {
 			// Arrange:
-			RunFinalizationContextTest([voterType, numHashes, action](const auto& context, const auto& keyPairContainers) {
-				const auto& keyPairContainer = keyPairContainers[utils::to_underlying_type(voterType)];
+			RunFinalizationContextTest([voterType, numHashes, action](const auto& context, const auto& keyPairDescriptors) {
+				const auto& keyPairDescriptor = keyPairDescriptors[utils::to_underlying_type(voterType)];
 
 				auto storage = mocks::MockSeekableMemoryStream();
 				auto otsTree = crypto::OtsTree::Create(
-						test::CopyKeyPair(keyPairContainer.VotingKeyPair),
+						test::CopyKeyPair(keyPairDescriptor.VotingKeyPair),
 						storage,
 						FinalizationPoint(1),
 						FinalizationPoint(20),
@@ -270,7 +235,7 @@ namespace catapult { namespace model {
 				auto hashes = test::GenerateRandomHashes(numHashes);
 
 				// Act:
-				auto pMessage = PrepareMessage(otsTree, keyPairContainer.VrfKeyPair, stepIdentifier, hashes, context);
+				auto pMessage = PrepareMessage(otsTree, keyPairDescriptor.VrfKeyPair, stepIdentifier, hashes, context);
 
 				// Assert:
 				action(pMessage, context, hashes);
@@ -305,8 +270,8 @@ namespace catapult { namespace model {
 	}
 
 	namespace {
-		model::HashRange ExtractHashes(const FinalizationMessage& message) {
-			return model::HashRange::CopyFixed(reinterpret_cast<const uint8_t*>(message.HashesPtr()), message.HashesCount);
+		HashRange ExtractHashes(const FinalizationMessage& message) {
+			return HashRange::CopyFixed(reinterpret_cast<const uint8_t*>(message.HashesPtr()), message.HashesCount);
 		}
 	}
 
@@ -321,7 +286,7 @@ namespace catapult { namespace model {
 			EXPECT_EQ(0u, pMessage->HashesCount);
 
 			EXPECT_EQ(crypto::StepIdentifier({ 3, 4, 5 }), pMessage->StepIdentifier);
-			EXPECT_EQ(0u, model::FindFirstDifferenceIndex(hashes, ExtractHashes(*pMessage)));
+			EXPECT_EQ(0u, FindFirstDifferenceIndex(hashes, ExtractHashes(*pMessage)));
 
 			// - check that the message is valid and can be processed
 			// - check that votes are within 1% of expected value
@@ -343,7 +308,7 @@ namespace catapult { namespace model {
 			EXPECT_EQ(3u, pMessage->HashesCount);
 
 			EXPECT_EQ(crypto::StepIdentifier({ 3, 4, 5 }), pMessage->StepIdentifier);
-			EXPECT_EQ(3u, model::FindFirstDifferenceIndex(hashes, ExtractHashes(*pMessage)));
+			EXPECT_EQ(3u, FindFirstDifferenceIndex(hashes, ExtractHashes(*pMessage)));
 
 			// - check that the message is valid and can be processed
 			// - check that votes are within 1% of expected value
@@ -359,45 +324,20 @@ namespace catapult { namespace model {
 	// region ProcessMessage
 
 	namespace {
-		void SetMessageSortitionHashProof(
-				FinalizationMessage& message,
-				const crypto::KeyPair& vrfKeyPair,
-				const GenerationHash& generationHash) {
-			std::vector<uint8_t> sortitionVrfInputBuffer(sizeof(crypto::StepIdentifier) + GenerationHash::Size);
-			std::memcpy(&sortitionVrfInputBuffer[0], &generationHash, GenerationHash::Size);
-			std::memcpy(&sortitionVrfInputBuffer[GenerationHash::Size], &message.StepIdentifier, sizeof(crypto::StepIdentifier));
-
-			message.SortitionHashProof = crypto::GenerateVrfProof(sortitionVrfInputBuffer, vrfKeyPair);
-		}
-
-		void SignMessage(FinalizationMessage& message, const crypto::KeyPair& votingKeyPair) {
-			auto storage = mocks::MockSeekableMemoryStream();
-			auto otsTree = crypto::OtsTree::Create(
-					test::CopyKeyPair(votingKeyPair),
-					storage,
-					FinalizationPoint(1),
-					FinalizationPoint(20),
-					{ 20, 20 });
-			message.Signature = otsTree.sign(message.StepIdentifier, {
-				reinterpret_cast<const uint8_t*>(&message) + FinalizationMessage::Header_Size,
-				message.Size - FinalizationMessage::Header_Size
-			});
-		}
-
 		template<typename TAction>
 		void RunProcessMessageTest(VoterType voterType, uint32_t numHashes, TAction action) {
 			// Arrange:
-			RunFinalizationContextTest([voterType, numHashes, action](const auto& context, const auto& keyPairContainers) {
-				const auto& keyPairContainer = keyPairContainers[utils::to_underlying_type(voterType)];
+			RunFinalizationContextTest([voterType, numHashes, action](const auto& context, const auto& keyPairDescriptors) {
+				const auto& keyPairDescriptor = keyPairDescriptors[utils::to_underlying_type(voterType)];
 
 				// - create message
 				auto pMessage = CreateMessage(numHashes);
 				pMessage->StepIdentifier = { 3, 4, 5 };
-				SetMessageSortitionHashProof(*pMessage, keyPairContainer.VrfKeyPair, context.generationHash());
-				SignMessage(*pMessage, keyPairContainer.VotingKeyPair);
+				test::SetMessageSortitionHashProof(*pMessage, keyPairDescriptor.VrfKeyPair, context.generationHash());
+				test::SignMessage(*pMessage, keyPairDescriptor.VotingKeyPair);
 
 				// Act + Assert:
-				action(context, keyPairContainer, *pMessage);
+				action(context, keyPairDescriptor, *pMessage);
 			});
 		}
 	}
@@ -431,10 +371,10 @@ namespace catapult { namespace model {
 
 	TEST(TEST_CLASS, ProcessMessage_FailsWhenSortitionHashProofIsInvalid) {
 		// Arrange:
-		RunProcessMessageTest(VoterType::Large, 3, [](const auto& context, const auto& keyPairContainer, auto& message) {
+		RunProcessMessageTest(VoterType::Large, 3, [](const auto& context, const auto& keyPairDescriptor, auto& message) {
 			// - corrupt proof and resign
 			test::FillWithRandomData(message.SortitionHashProof.Gamma);
-			SignMessage(message, keyPairContainer.VotingKeyPair);
+			test::SignMessage(message, keyPairDescriptor.VotingKeyPair);
 
 			// Act:
 			auto processResultPair = ProcessMessage(message, context);

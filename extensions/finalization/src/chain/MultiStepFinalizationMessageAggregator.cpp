@@ -69,7 +69,7 @@ namespace catapult { namespace chain {
 		return m_state.StepDataTuplesMap.size();
 	}
 
-	const crypto::StepIdentifier& MultiStepFinalizationMessageAggregatorView::minStepIdentifier() const {
+	crypto::StepIdentifier MultiStepFinalizationMessageAggregatorView::minStepIdentifier() const {
 		return m_state.MinStepIdentifier;
 	}
 

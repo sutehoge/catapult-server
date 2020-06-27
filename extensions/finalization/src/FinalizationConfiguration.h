@@ -19,6 +19,8 @@
 **/
 
 #pragma once
+#include "catapult/utils/FileSize.h"
+#include "catapult/utils/TimeSpan.h"
 #include <boost/filesystem/path.hpp>
 
 namespace catapult { namespace utils { class ConfigurationBag; } }
@@ -33,6 +35,12 @@ namespace catapult { namespace finalization {
 
 		/// Finalization threshold.
 		uint64_t Threshold;
+
+		/// Duration of a finalization message in the short lived cache.
+		utils::TimeSpan ShortLivedCacheMessageDuration;
+
+		/// Maximum size of a finalization message synchronization response.
+		utils::FileSize MessageSynchronizationMaxResponseSize;
 
 	private:
 		FinalizationConfiguration() = default;

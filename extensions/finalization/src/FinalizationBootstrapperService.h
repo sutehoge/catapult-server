@@ -24,6 +24,11 @@
 #include "catapult/extensions/ServiceRegistrar.h"
 #include "catapult/handlers/HandlerTypes.h"
 
+namespace catapult {
+	namespace chain { class MultiStepFinalizationMessageAggregator; }
+	namespace finalization { struct FinalizationConfiguration; }
+}
+
 namespace catapult { namespace finalization {
 
 	// region FinalizationServerHooks
@@ -48,9 +53,12 @@ namespace catapult { namespace finalization {
 
 	// endregion
 
-	/// Creates a registrar for a finalization bootstrapper service.
+	/// Creates a registrar for a finalization bootstrapper service around \a config.
 	/// \note This service is responsible for registering root finalization services.
-	DECLARE_SERVICE_REGISTRAR(FinalizationBootstrapper)();
+	DECLARE_SERVICE_REGISTRAR(FinalizationBootstrapper)(const FinalizationConfiguration& config);
+
+	/// Gets the multi step finalization message aggregator stored in \a locator.
+	chain::MultiStepFinalizationMessageAggregator& GetMultiStepFinalizationMessageAggregator(const extensions::ServiceLocator& locator);
 
 	/// Gets the finalization server hooks stored in \a locator.
 	FinalizationServerHooks& GetFinalizationServerHooks(const extensions::ServiceLocator& locator);

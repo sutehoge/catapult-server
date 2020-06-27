@@ -19,7 +19,9 @@
 **/
 
 #include "finalization/src/FinalizationBootstrapperService.h"
-#include "tests/test/local/ServiceLocatorTestContext.h"
+#include "finalization/src/FinalizationConfiguration.h"
+#include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
+#include "finalization/tests/test/FinalizationBootstrapperServiceTestUtils.h"
 #include "tests/test/local/ServiceTestUtils.h"
 #include "tests/TestHarness.h"
 
@@ -95,19 +97,38 @@ namespace catapult { namespace finalization {
 
 	// endregion
 
+	// region FinalizationBootstrapperService - test context
+
 	namespace {
+		using VoterType = test::FinalizationBootstrapperServiceTestUtils::VoterType;
+
+		constexpr auto Active_Steps_Counter_Name = "FIN ACT STEPS";
+
 		struct FinalizationBootstrapperServiceTraits {
-			static constexpr auto CreateRegistrar = CreateFinalizationBootstrapperServiceRegistrar;
+			static auto CreateRegistrar() {
+				auto config = FinalizationConfiguration::Uninitialized();
+				config.Size = 3000;
+				config.Threshold = 2000;
+				return CreateFinalizationBootstrapperServiceRegistrar(config);
+			}
 		};
 
-		using TestContext = test::ServiceLocatorTestContext<FinalizationBootstrapperServiceTraits>;
+		using TestContext = test::VoterSeededCacheDependentServiceLocatorTestContext<FinalizationBootstrapperServiceTraits>;
+
+		void AssertStepIdentifierCounters(const TestContext& context, uint64_t point, uint64_t round, uint64_t subround) {
+			EXPECT_EQ(point, context.counter("FIN POINT"));
+			EXPECT_EQ(round, context.counter("FIN ROUND"));
+			EXPECT_EQ(subround, context.counter("FIN SUBROUND"));
+		}
 	}
 
-	// region FinalizationBootstrapperService basic
+	// endregion
+
+	// region FinalizationBootstrapperService - basic
 
 	ADD_SERVICE_REGISTRAR_INFO_TEST(FinalizationBootstrapper, Initial)
 
-	TEST(TEST_CLASS, NoCountersAreRegistered) {
+	TEST(TEST_CLASS, MultiStepAggregatorServiceIsRegistered) {
 		// Arrange:
 		TestContext context;
 
@@ -115,7 +136,17 @@ namespace catapult { namespace finalization {
 		context.boot();
 
 		// Assert:
-		EXPECT_EQ(0u, context.locator().counters().size());
+		EXPECT_EQ(2u, context.locator().numServices());
+		EXPECT_EQ(4u, context.locator().counters().size());
+
+		// - service
+		const auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
+		EXPECT_EQ(0u, aggregator.view().size());
+		EXPECT_EQ(crypto::StepIdentifier({ 1, 0, 0 }), aggregator.view().minStepIdentifier());
+
+		// - counters
+		EXPECT_EQ(0u, context.counter(Active_Steps_Counter_Name));
+		AssertStepIdentifierCounters(context, 1, 0, 0);
 	}
 
 	TEST(TEST_CLASS, FinalizationHooksServiceIsRegistered) {
@@ -126,10 +157,80 @@ namespace catapult { namespace finalization {
 		context.boot();
 
 		// Assert:
-		EXPECT_EQ(1u, context.locator().numServices());
+		EXPECT_EQ(2u, context.locator().numServices());
 
 		// - service (get does not throw)
 		GetFinalizationServerHooks(context.locator());
+	}
+
+	// endregion
+
+	// region FinalizationBootstrapperService - multi step aggregator
+
+	TEST(TEST_CLASS, MultiStepAggregatorServiceCountersAreNotUpdatedWhenMessageIsRejected) {
+		// Arrange:
+		TestContext context;
+		context.boot();
+
+		auto pMessage = context.createMessage(VoterType::Ineligible, { 1, 2, 3 }, test::GenerateRandomByteArray<Hash256>());
+
+		// Act:
+		auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
+		aggregator.modifier().add(pMessage);
+
+		// - wait for message to be processed
+		test::Pause();
+
+		// Assert:
+		EXPECT_EQ(0u, context.counter(Active_Steps_Counter_Name));
+		AssertStepIdentifierCounters(context, 1, 0, 0);
+	}
+
+	TEST(TEST_CLASS, MultiStepAggregatorServiceCountersAreUpdatedWhenMessageIsAccepted) {
+		// Arrange:
+		TestContext context;
+		context.boot();
+
+		auto pMessage = context.createMessage(VoterType::Large1, { 1, 2, 3 }, test::GenerateRandomByteArray<Hash256>());
+
+		// Act:
+		auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
+		aggregator.modifier().add(pMessage);
+
+		// - wait for message to be processed
+		WAIT_FOR_ONE_EXPR(context.counter(Active_Steps_Counter_Name));
+
+		// Assert:
+		EXPECT_EQ(1u, context.counter(Active_Steps_Counter_Name));
+		AssertStepIdentifierCounters(context, 1, 0, 0);
+
+		// Sanity:
+		EXPECT_EQ(crypto::StepIdentifier({ 1, 0, 0 }), aggregator.view().minStepIdentifier());
+	}
+
+	TEST(TEST_CLASS, MultiStepAggregatorServiceCountersAreUpdatedWhenMessageConsensusIsReached) {
+		// Arrange:
+		TestContext context;
+		context.boot();
+
+		auto hash = test::GenerateRandomByteArray<Hash256>();
+		auto pMessage1 = context.createMessage(VoterType::Large1, { 1, 2, 3 }, hash);
+		auto pMessage2 = context.createMessage(VoterType::Large2, { 1, 2, 3 }, hash);
+
+		// Act:
+		auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
+		aggregator.modifier().add(pMessage1);
+		aggregator.modifier().add(pMessage2);
+
+		// - wait for message to be processed
+		WAIT_FOR_VALUE_EXPR(crypto::StepIdentifier({ 1, 2, 3 }), aggregator.view().minStepIdentifier());
+
+		// Assert:
+		EXPECT_EQ(1u, context.counter(Active_Steps_Counter_Name));
+		AssertStepIdentifierCounters(context, 1, 2, 3);
+
+		// Sanity:
+		EXPECT_EQ(crypto::StepIdentifier({ 1, 2, 3 }), aggregator.view().minStepIdentifier());
 	}
 
 	// endregion

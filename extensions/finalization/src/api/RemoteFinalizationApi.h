@@ -19,20 +19,14 @@
 **/
 
 #pragma once
+#include "finalization/src/model/FinalizationMessage.h"
 #include "catapult/api/RemoteApi.h"
 #include "catapult/model/RangeTypes.h"
 #include "catapult/thread/Future.h"
 
-namespace catapult {
-	namespace crypto { struct StepIdentifier; }
-	namespace ionet { class PacketIo; }
-	namespace model { struct FinalizationMessage; }
-}
+namespace catapult { namespace ionet { class PacketIo; } }
 
 namespace catapult { namespace api {
-
-	/// Range of finalization messages.
-	using FinalizationMessageRange = model::EntityRange<model::FinalizationMessage>;
 
 	/// Api for retrieving finalization information from a remote node.
 	class RemoteFinalizationApi : public RemoteApi {
@@ -44,7 +38,7 @@ namespace catapult { namespace api {
 	public:
 		/// Gets all finalization messages from the remote starting at \a stepIdentifier excluding those with all hashes
 		/// in \a knownShortHashes.
-		virtual thread::future<FinalizationMessageRange> messages(
+		virtual thread::future<model::FinalizationMessageRange> messages(
 				const crypto::StepIdentifier& stepIdentifier,
 				model::ShortHashRange&& knownShortHashes) const = 0;
 	};

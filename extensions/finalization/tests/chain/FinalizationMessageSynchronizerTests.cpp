@@ -37,6 +37,7 @@ namespace catapult { namespace chain {
 
 	namespace {
 		using MockRemoteApi = mocks::MockFinalizationApi;
+		using ShortHashesSupplier = supplier<model::ShortHashRange>;
 
 		class FinalizationMessageSynchronizerTraits {
 		public:
@@ -46,7 +47,7 @@ namespace catapult { namespace chain {
 		public:
 			class RemoteApiWrapper {
 			public:
-				explicit RemoteApiWrapper(const api::FinalizationMessageRange& messageRange)
+				explicit RemoteApiWrapper(const model::FinalizationMessageRange& messageRange)
 						: m_pFinalizationApi(std::make_unique<MockRemoteApi>(messageRange))
 				{}
 
@@ -94,18 +95,20 @@ namespace catapult { namespace chain {
 					message.HashesCount = 0;
 				}
 
-				return api::FinalizationMessageRange::CopyFixed(buffer.data(), count);
+				return model::FinalizationMessageRange::CopyFixed(buffer.data(), count);
 			}
 
-			static auto CreateRemoteApi(const api::FinalizationMessageRange& messageRange) {
+			static auto CreateRemoteApi(const model::FinalizationMessageRange& messageRange) {
 				return RemoteApiWrapper(messageRange);
 			}
 
 			static auto CreateSynchronizer(
 					const ShortHashesSupplier& shortHashesSupplier,
 					const handlers::MessageRangeHandler& messageRangeConsumer) {
-				auto stepIdentifierSupplier = []() { return crypto::StepIdentifier{ 11, 23, 67 }; };
-				return CreateFinalizationMessageSynchronizer(stepIdentifierSupplier, shortHashesSupplier, messageRangeConsumer);
+				auto messageFilterSupplier = [shortHashesSupplier] {
+					return std::make_pair(crypto::StepIdentifier{ 11, 23, 67 }, shortHashesSupplier());
+				};
+				return CreateFinalizationMessageSynchronizer(messageFilterSupplier, messageRangeConsumer);
 			}
 		};
 	}

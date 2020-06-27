@@ -82,7 +82,7 @@ namespace catapult { namespace api {
 				EXPECT_EQ_MEMORY(packet.Data() + Request_Data_Header_Size, KnownShortHashValues().data(), Request_Data_Size);
 			}
 
-			static void ValidateResponse(const ionet::Packet& response, const FinalizationMessageRange& messages) {
+			static void ValidateResponse(const ionet::Packet& response, const model::FinalizationMessageRange& messages) {
 				ASSERT_EQ(3u, messages.size());
 
 				const auto* pExpectedData = response.Data();

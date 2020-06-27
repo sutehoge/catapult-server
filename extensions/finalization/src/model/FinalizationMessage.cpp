@@ -68,7 +68,7 @@ namespace catapult { namespace model {
 			crypto::OtsTree& otsTree,
 			const crypto::KeyPair& vrfKeyPair,
 			const crypto::StepIdentifier& stepIdentifier,
-			const model::HashRange& hashes,
+			const HashRange& hashes,
 			const FinalizationContext& context) {
 		auto accountView = context.lookup(otsTree.rootPublicKey().copyTo<VotingKey>());
 		if (Amount() == accountView.Weight)

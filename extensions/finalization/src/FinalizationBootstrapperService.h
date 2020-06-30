@@ -19,6 +19,7 @@
 **/
 
 #pragma once
+#include "finalization/src/io/ProofStorage.h"
 #include "finalization/src/model/FinalizationMessage.h"
 #include "catapult/extensions/BasicServerHooks.h"
 #include "catapult/extensions/ServiceRegistrar.h"
@@ -53,9 +54,11 @@ namespace catapult { namespace finalization {
 
 	// endregion
 
-	/// Creates a registrar for a finalization bootstrapper service around \a config.
+	/// Creates a registrar for a finalization bootstrapper service around \a config and \a pProofStorage.
 	/// \note This service is responsible for registering root finalization services.
-	DECLARE_SERVICE_REGISTRAR(FinalizationBootstrapper)(const FinalizationConfiguration& config);
+	DECLARE_SERVICE_REGISTRAR(FinalizationBootstrapper)(
+			const FinalizationConfiguration& config,
+			std::unique_ptr<io::ProofStorage>&& pProofStorage);
 
 	/// Gets the multi step finalization message aggregator stored in \a locator.
 	chain::MultiStepFinalizationMessageAggregator& GetMultiStepFinalizationMessageAggregator(const extensions::ServiceLocator& locator);

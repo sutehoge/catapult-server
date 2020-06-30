@@ -32,7 +32,7 @@ namespace catapult { namespace test {
 	class FinalizationBootstrapperServiceTestUtils {
 	public:
 		/// Number of expected bootstrapper services.
-		static constexpr auto Num_Bootstrapper_Services = 2u;
+		static constexpr auto Num_Bootstrapper_Services = 3u;
 
 		/// Types of accounts registered by CreateCache.
 		enum class VoterType : uint32_t { Small, Large1, Ineligible, Large2 };
@@ -97,11 +97,25 @@ namespace catapult { namespace test {
 
 	public:
 		/// Creates a valid finalization message with \a stepIdentifier and one \a hash for the account specified by \a voterType.
+		/// \note This function assumes that the nemesis block is the last finalized block.
 		std::shared_ptr<model::FinalizationMessage> createMessage(
 				TestUtils::VoterType voterType,
 				const crypto::StepIdentifier& stepIdentifier,
 				const Hash256& hash) {
-			return CreateValidMessage(stepIdentifier, Height(2), hash, m_keyPairDescriptors[utils::to_underlying_type(voterType)]);
+			const auto& keyPairDescriptor = m_keyPairDescriptors[utils::to_underlying_type(voterType)];
+			return CreateValidNemesisMessage(stepIdentifier, hash, keyPairDescriptor);
+		}
+
+		/// Creates a valid finalization message with \a stepIdentifier and one \a hash at \a height for the account
+		/// specified by \a voterType given the last finalized generation hash (\a lastFinalizedGenerationHash).
+		std::shared_ptr<model::FinalizationMessage> createMessage(
+				TestUtils::VoterType voterType,
+				const crypto::StepIdentifier& stepIdentifier,
+				Height height,
+				const Hash256& hash,
+				const GenerationHash& lastFinalizedGenerationHash) {
+			const auto& keyPairDescriptor = m_keyPairDescriptors[utils::to_underlying_type(voterType)];
+			return CreateValidMessage(stepIdentifier, height, hash, lastFinalizedGenerationHash, keyPairDescriptor);
 		}
 
 	private:

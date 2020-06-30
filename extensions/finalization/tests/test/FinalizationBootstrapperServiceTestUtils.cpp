@@ -21,6 +21,7 @@
 #include "FinalizationBootstrapperServiceTestUtils.h"
 #include "finalization/src/FinalizationConfiguration.h"
 #include "catapult/cache_core/AccountStateCache.h"
+#include "finalization/tests/test/mocks/MockProofStorage.h"
 #include "tests/test/cache/CacheTestUtils.h"
 #include "tests/test/nodeps/TestConstants.h"
 
@@ -50,7 +51,7 @@ namespace catapult { namespace test {
 		config.Size = 3000;
 		config.Threshold = 2000;
 
-		auto pBootstrapperRegistrar = CreateFinalizationBootstrapperServiceRegistrar(config);
+		auto pBootstrapperRegistrar = CreateFinalizationBootstrapperServiceRegistrar(config, std::make_unique<mocks::MockProofStorage>());
 		pBootstrapperRegistrar->registerServices(locator, state);
 	}
 }}

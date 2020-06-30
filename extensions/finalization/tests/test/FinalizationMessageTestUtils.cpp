@@ -66,17 +66,24 @@ namespace catapult { namespace test {
 		return pMessage;
 	}
 
+	std::unique_ptr<model::FinalizationMessage> CreateValidNemesisMessage(
+			const crypto::StepIdentifier& stepIdentifier,
+			const Hash256& hash,
+			const AccountKeyPairDescriptor& keyPairDescriptor) {
+		auto nemesisGenerationHash = model::CalculateGenerationHash(GetNemesisBlock().GenerationHashProof.Gamma);
+		return CreateValidMessage(stepIdentifier, Height(2), hash, nemesisGenerationHash, keyPairDescriptor);
+	}
+
 	std::unique_ptr<model::FinalizationMessage> CreateValidMessage(
 			const crypto::StepIdentifier& stepIdentifier,
 			Height height,
 			const Hash256& hash,
+			const GenerationHash& lastFinalizedGenerationHash,
 			const AccountKeyPairDescriptor& keyPairDescriptor) {
 		auto pMessage = CreateMessage(stepIdentifier, hash);
 		pMessage->Height = height;
 
-		auto nemesisGenerationHash = model::CalculateGenerationHash(GetNemesisBlock().GenerationHashProof.Gamma);
-
-		SetMessageSortitionHashProof(*pMessage, keyPairDescriptor.VrfKeyPair, nemesisGenerationHash);
+		SetMessageSortitionHashProof(*pMessage, keyPairDescriptor.VrfKeyPair, lastFinalizedGenerationHash);
 		SignMessage(*pMessage, keyPairDescriptor.VotingKeyPair);
 		return pMessage;
 	}

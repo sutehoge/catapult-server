@@ -20,6 +20,7 @@
 
 #include "FinalizationBootstrapperService.h"
 #include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
+#include "finalization/src/io/ProofStorageCache.h"
 #include "finalization/src/model/FinalizationContext.h"
 #include "catapult/cache/CatapultCache.h"
 #include "catapult/cache_core/AccountStateCache.h"
@@ -27,19 +28,69 @@
 #include "catapult/extensions/ServiceLocator.h"
 #include "catapult/extensions/ServiceState.h"
 #include "catapult/io/BlockStorageCache.h"
+#include "catapult/subscribers/FinalizationSubscriber.h"
 
 namespace catapult { namespace finalization {
 
 	namespace {
 		constexpr auto Hooks_Service_Name = "fin.hooks";
+		constexpr auto Storage_Service_Name = "fin.proof.storage";
 		constexpr auto Aggregator_Service_Name = "fin.aggregator.multistep";
 
-		// region CreateMultiStepAggregator
+		// region FinalizationContextFactory
 
-		FinalizationPoint GetNextFinalizationPoint(const io::BlockStorageCache& /*storage*/) {
-			// TODO: this is a placeholder
-			return FinalizationPoint(1);
-		}
+		class FinalizationContextFactory {
+		public:
+			FinalizationContextFactory(
+					const FinalizationConfiguration& config,
+					const cache::AccountStateCache& accountStateCache,
+					const io::BlockStorageCache& storage,
+					const io::ProofStorageCache& proofStorage)
+					: m_config(config)
+					, m_accountStateCache(accountStateCache)
+					, m_storage(storage)
+					, m_proofStorage(proofStorage)
+			{}
+
+		public:
+			model::FinalizationContext operator()() const {
+				auto storageContext = loadStorageContext();
+				auto accountStateCacheView = m_accountStateCache.createView();
+				return model::FinalizationContext(
+						storageContext.NextFinalizationPoint,
+						storageContext.LastFinalizedHeight,
+						storageContext.LastFinalizedGenerationHash,
+						m_config,
+						*accountStateCacheView);
+			}
+
+		private:
+			struct StorageContext {
+				FinalizationPoint NextFinalizationPoint;
+				Height LastFinalizedHeight;
+				GenerationHash LastFinalizedGenerationHash;
+			};
+
+		private:
+			StorageContext loadStorageContext() const {
+				auto proofStorageView = m_proofStorage.view();
+				auto point = proofStorageView.finalizationPoint();
+				auto height = proofStorageView.finalizedHeight();
+
+				auto generationHash = m_storage.view().loadBlockElement(height)->GenerationHash;
+				return { point + FinalizationPoint(1), height, generationHash };
+			}
+
+		private:
+			FinalizationConfiguration m_config;
+			const cache::AccountStateCache& m_accountStateCache;
+			const io::BlockStorageCache& m_storage;
+			const io::ProofStorageCache& m_proofStorage;
+		};
+
+		// endregion
+
+		// region CreateMultiStepAggregator
 
 		chain::SingleStepAggregatorFactory CreateSingleStepAggregatorFactory(const FinalizationConfiguration& config) {
 			return [config](const auto& stepIdentifier) {
@@ -49,39 +100,36 @@ namespace catapult { namespace finalization {
 			};
 		}
 
-		chain::MessageProcessor CreateFinalizationMessageProcessor(
-				const FinalizationConfiguration& config,
-				const cache::AccountStateCache& accountStateCache,
-				const io::BlockStorageCache& storage) {
-			return [config, &accountStateCache, &storage](const auto& message) {
-				// TODO: point and height need to come from proof storage
-				auto point = GetNextFinalizationPoint(storage);
-
-				Height height;
-				GenerationHash generationHash;
-				{
-					auto storageView = storage.view();
-					height = Height(1);
-					generationHash = storageView.loadBlockElement(height)->GenerationHash;
-				}
-
-				model::FinalizationContext finalizationContext(point, height, generationHash, config, *accountStateCache.createView());
+		chain::MessageProcessor CreateFinalizationMessageProcessor(const FinalizationContextFactory& finalizationContextFactory) {
+			return [finalizationContextFactory](const auto& message) {
+				auto finalizationContext = finalizationContextFactory();
 				return ProcessMessage(message, finalizationContext);
 			};
 		}
 
-		auto CreateMultiStepAggregator(const FinalizationConfiguration& config, extensions::ServiceState& state) {
-			auto messageProcessor = CreateFinalizationMessageProcessor(
+		auto CreateMultiStepAggregator(
+				const FinalizationConfiguration& config,
+				extensions::ServiceState& state,
+				io::ProofStorageCache& proofStorage) {
+			FinalizationContextFactory finalizationContextFactory(
 					config,
 					state.cache().sub<cache::AccountStateCache>(),
-					state.storage());
+					state.storage(),
+					proofStorage);
+			auto messageProcessor = CreateFinalizationMessageProcessor(finalizationContextFactory);
+
+			auto& subscriber = state.finalizationSubscriber();
 			return std::make_shared<chain::MultiStepFinalizationMessageAggregator>(
 					config.MessageSynchronizationMaxResponseSize.bytes(),
 					messageProcessor,
 					CreateSingleStepAggregatorFactory(config),
-					[](const auto& stepIdentifier, const auto&, const auto&) {
+					[&proofStorage, &subscriber](const auto& stepIdentifier, const auto& heightHashPair, const auto& proof) {
 						CATAPULT_LOG(important) << "finalized consensus reached for " << stepIdentifier;
-						// TODO: this should call subscriber
+
+						// TODO: need to trigger subscriber and storage only when *final* consensus for a FP is reached
+						auto height = heightHashPair.Height;
+						proofStorage.modifier().saveProof(height, proof);
+						subscriber.notifyFinalizedBlock(height, heightHashPair.Hash, FinalizationPoint(stepIdentifier.Point));
 					});
 		}
 
@@ -91,7 +139,11 @@ namespace catapult { namespace finalization {
 
 		class FinalizationBootstrapperServiceRegistrar : public extensions::ServiceRegistrar {
 		public:
-			explicit FinalizationBootstrapperServiceRegistrar(const FinalizationConfiguration& config) : m_config(config)
+			FinalizationBootstrapperServiceRegistrar(
+					const FinalizationConfiguration& config,
+					std::unique_ptr<io::ProofStorage>&& pProofStorage)
+					: m_config(config)
+					, m_pProofStorageCache(std::make_unique<io::ProofStorageCache>(std::move(pProofStorage)))
 			{}
 
 		public:
@@ -120,20 +172,26 @@ namespace catapult { namespace finalization {
 				// register services
 				locator.registerRootedService(Hooks_Service_Name, std::make_shared<FinalizationServerHooks>());
 
-				auto pMultiStepAggregator = CreateMultiStepAggregator(m_config, state);
-				pMultiStepAggregator->modifier().setNextFinalizationPoint(FinalizationPoint(1)); // TODO: read from proof storage
+				locator.registerRootedService(Storage_Service_Name, m_pProofStorageCache);
+
+				auto nextFinalizationPoint = m_pProofStorageCache->view().finalizationPoint() + FinalizationPoint(1);
+				auto pMultiStepAggregator = CreateMultiStepAggregator(m_config, state, *m_pProofStorageCache);
+				pMultiStepAggregator->modifier().setNextFinalizationPoint(nextFinalizationPoint);
 				locator.registerRootedService(Aggregator_Service_Name, pMultiStepAggregator);
 			}
 
 		private:
 			FinalizationConfiguration m_config;
+			std::shared_ptr<io::ProofStorageCache> m_pProofStorageCache;
 		};
 
 		// endregion
 	}
 
-	DECLARE_SERVICE_REGISTRAR(FinalizationBootstrapper)(const FinalizationConfiguration& config) {
-		return std::make_unique<FinalizationBootstrapperServiceRegistrar>(config);
+	DECLARE_SERVICE_REGISTRAR(FinalizationBootstrapper)(
+			const FinalizationConfiguration& config,
+			std::unique_ptr<io::ProofStorage>&& pProofStorage) {
+		return std::make_unique<FinalizationBootstrapperServiceRegistrar>(config, std::move(pProofStorage));
 	}
 
 	chain::MultiStepFinalizationMessageAggregator& GetMultiStepFinalizationMessageAggregator(const extensions::ServiceLocator& locator) {

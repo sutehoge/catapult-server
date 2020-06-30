@@ -119,7 +119,7 @@ namespace catapult { namespace finalization {
 
 		// - prepare message(s)
 		const auto& hash = test::GenerateRandomByteArray<Hash256>();
-		auto pMessage = context.createMessage(VoterType::Large1, { 1, 2, 3 }, hash);
+		auto pMessage = context.createMessage(VoterType::Large1, { 2, 3, 3 }, hash);
 
 		// Act:
 		hooks.messageRangeConsumer()(CreateMessageRange({ pMessage }));
@@ -146,11 +146,11 @@ namespace catapult { namespace finalization {
 
 		// - prepare message(s)
 		const auto& hash = test::GenerateRandomByteArray<Hash256>();
-		auto pMessage1 = context.createMessage(VoterType::Large1, { 1, 2, 3 }, hash);
-		auto pMessage2 = context.createMessage(VoterType::Large1, { 1, 2, 4 }, hash);
-		auto pMessage3 = context.createMessage(VoterType::Large1, { 1, 2, 5 }, hash);
-		auto pMessage4 = context.createMessage(VoterType::Large1, { 1, 2, 6 }, hash);
-		auto pMessage5 = context.createMessage(VoterType::Large1, { 1, 2, 7 }, hash);
+		auto pMessage1 = context.createMessage(VoterType::Large1, { 2, 3, 3 }, hash);
+		auto pMessage2 = context.createMessage(VoterType::Large1, { 2, 3, 4 }, hash);
+		auto pMessage3 = context.createMessage(VoterType::Large1, { 2, 3, 5 }, hash);
+		auto pMessage4 = context.createMessage(VoterType::Large1, { 2, 3, 6 }, hash);
+		auto pMessage5 = context.createMessage(VoterType::Large1, { 2, 3, 7 }, hash);
 
 		// Act:
 		hooks.messageRangeConsumer()(CreateMessageRange({ pMessage1, pMessage3, pMessage5 }));
@@ -179,9 +179,9 @@ namespace catapult { namespace finalization {
 
 		// - prepare message(s)
 		const auto& hash = test::GenerateRandomByteArray<Hash256>();
-		auto pMessage1 = context.createMessage(VoterType::Large1, { 1, 2, 3 }, hash);
-		auto pMessage2 = context.createMessage(VoterType::Large1, { 1, 2, 4 }, hash);
-		auto pMessage3 = context.createMessage(VoterType::Large1, { 1, 2, 5 }, hash);
+		auto pMessage1 = context.createMessage(VoterType::Large1, { 2, 3, 3 }, hash);
+		auto pMessage2 = context.createMessage(VoterType::Large1, { 2, 3, 4 }, hash);
+		auto pMessage3 = context.createMessage(VoterType::Large1, { 2, 3, 5 }, hash);
 
 		// - send first range
 		hooks.messageRangeConsumer()(CreateMessageRange({ pMessage2 }));
@@ -216,9 +216,9 @@ namespace catapult { namespace finalization {
 
 		// - prepare message(s)
 		const auto& hash = test::GenerateRandomByteArray<Hash256>();
-		auto pMessage1 = context.createMessage(VoterType::Large1, { 1, 2, 3 }, hash);
-		auto pMessage2 = context.createMessage(VoterType::Large1, { 1, 2, 4 }, hash);
-		auto pMessage3 = context.createMessage(VoterType::Large1, { 1, 2, 5 }, hash);
+		auto pMessage1 = context.createMessage(VoterType::Large1, { 2, 3, 3 }, hash);
+		auto pMessage2 = context.createMessage(VoterType::Large1, { 2, 3, 4 }, hash);
+		auto pMessage3 = context.createMessage(VoterType::Large1, { 2, 3, 5 }, hash);
 
 		// - send first range
 		hooks.messageRangeConsumer()(CreateMessageRange({ pMessage1, pMessage2, pMessage3 }));

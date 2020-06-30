@@ -21,8 +21,12 @@
 #include "finalization/src/FinalizationBootstrapperService.h"
 #include "finalization/src/FinalizationConfiguration.h"
 #include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
+#include "finalization/src/io/ProofStorageCache.h"
 #include "finalization/tests/test/FinalizationBootstrapperServiceTestUtils.h"
+#include "finalization/tests/test/mocks/MockProofStorage.h"
+#include "tests/test/core/BlockTestUtils.h"
 #include "tests/test/local/ServiceTestUtils.h"
+#include "tests/test/nodeps/Filesystem.h"
 #include "tests/TestHarness.h"
 
 namespace catapult { namespace finalization {
@@ -102,14 +106,19 @@ namespace catapult { namespace finalization {
 	namespace {
 		using VoterType = test::FinalizationBootstrapperServiceTestUtils::VoterType;
 
+		constexpr auto Num_Services = test::FinalizationBootstrapperServiceTestUtils::Num_Bootstrapper_Services;
 		constexpr auto Active_Steps_Counter_Name = "FIN ACT STEPS";
 
 		struct FinalizationBootstrapperServiceTraits {
-			static auto CreateRegistrar() {
+			static auto CreateRegistrar(std::unique_ptr<io::ProofStorage>&& pProofStorage) {
 				auto config = FinalizationConfiguration::Uninitialized();
 				config.Size = 3000;
 				config.Threshold = 2000;
-				return CreateFinalizationBootstrapperServiceRegistrar(config);
+				return CreateFinalizationBootstrapperServiceRegistrar(config, std::move(pProofStorage));
+			}
+
+			static auto CreateRegistrar() {
+				return CreateRegistrar(std::make_unique<mocks::MockProofStorage>());
 			}
 		};
 
@@ -136,17 +145,17 @@ namespace catapult { namespace finalization {
 		context.boot();
 
 		// Assert:
-		EXPECT_EQ(2u, context.locator().numServices());
+		EXPECT_EQ(Num_Services, context.locator().numServices());
 		EXPECT_EQ(4u, context.locator().counters().size());
 
 		// - service
 		const auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
 		EXPECT_EQ(0u, aggregator.view().size());
-		EXPECT_EQ(crypto::StepIdentifier({ 1, 0, 0 }), aggregator.view().minStepIdentifier());
+		EXPECT_EQ(crypto::StepIdentifier({ 2, 0, 0 }), aggregator.view().minStepIdentifier());
 
 		// - counters
 		EXPECT_EQ(0u, context.counter(Active_Steps_Counter_Name));
-		AssertStepIdentifierCounters(context, 1, 0, 0);
+		AssertStepIdentifierCounters(context, 2, 0, 0);
 	}
 
 	TEST(TEST_CLASS, FinalizationHooksServiceIsRegistered) {
@@ -157,22 +166,45 @@ namespace catapult { namespace finalization {
 		context.boot();
 
 		// Assert:
-		EXPECT_EQ(2u, context.locator().numServices());
+		EXPECT_EQ(Num_Services, context.locator().numServices());
 
 		// - service (get does not throw)
 		GetFinalizationServerHooks(context.locator());
+	}
+
+	TEST(TEST_CLASS, ProofStorageServiceIsRegistered) {
+		// Arrange:
+		TestContext context;
+
+		// Act:
+		context.boot();
+
+		// Assert:
+		EXPECT_EQ(Num_Services, context.locator().numServices());
+
+		// - service (get does not throw)
+		context.locator().service<io::ProofStorageCache>("fin.proof.storage");
 	}
 
 	// endregion
 
 	// region FinalizationBootstrapperService - multi step aggregator
 
+	namespace {
+		const auto& GetFinalizationSubscriberParams(const TestContext& context) {
+			return context.testState().finalizationSubscriber().finalizedBlockParams().params();
+		}
+	}
+
 	TEST(TEST_CLASS, MultiStepAggregatorServiceCountersAreNotUpdatedWhenMessageIsRejected) {
 		// Arrange:
-		TestContext context;
-		context.boot();
+		auto pProofStorage = std::make_unique<mocks::MockProofStorage>();
+		const auto& proofStorage = *pProofStorage;
 
-		auto pMessage = context.createMessage(VoterType::Ineligible, { 1, 2, 3 }, test::GenerateRandomByteArray<Hash256>());
+		TestContext context;
+		context.boot(std::move(pProofStorage));
+
+		auto pMessage = context.createMessage(VoterType::Ineligible, { 2, 3, 4 }, test::GenerateRandomByteArray<Hash256>());
 
 		// Act:
 		auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
@@ -183,15 +215,25 @@ namespace catapult { namespace finalization {
 
 		// Assert:
 		EXPECT_EQ(0u, context.counter(Active_Steps_Counter_Name));
-		AssertStepIdentifierCounters(context, 1, 0, 0);
+		AssertStepIdentifierCounters(context, 2, 0, 0);
+
+		// - check aggregator
+		EXPECT_EQ(crypto::StepIdentifier({ 2, 0, 0 }), aggregator.view().minStepIdentifier());
+
+		// - subscriber and storage weren't called
+		EXPECT_TRUE(GetFinalizationSubscriberParams(context).empty());
+		EXPECT_TRUE(proofStorage.savedProofDescriptors().empty());
 	}
 
 	TEST(TEST_CLASS, MultiStepAggregatorServiceCountersAreUpdatedWhenMessageIsAccepted) {
 		// Arrange:
-		TestContext context;
-		context.boot();
+		auto pProofStorage = std::make_unique<mocks::MockProofStorage>();
+		const auto& proofStorage = *pProofStorage;
 
-		auto pMessage = context.createMessage(VoterType::Large1, { 1, 2, 3 }, test::GenerateRandomByteArray<Hash256>());
+		TestContext context;
+		context.boot(std::move(pProofStorage));
+
+		auto pMessage = context.createMessage(VoterType::Large1, { 2, 3, 4 }, test::GenerateRandomByteArray<Hash256>());
 
 		// Act:
 		auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
@@ -202,20 +244,27 @@ namespace catapult { namespace finalization {
 
 		// Assert:
 		EXPECT_EQ(1u, context.counter(Active_Steps_Counter_Name));
-		AssertStepIdentifierCounters(context, 1, 0, 0);
+		AssertStepIdentifierCounters(context, 2, 0, 0);
 
-		// Sanity:
-		EXPECT_EQ(crypto::StepIdentifier({ 1, 0, 0 }), aggregator.view().minStepIdentifier());
+		// - check aggregator
+		EXPECT_EQ(crypto::StepIdentifier({ 2, 0, 0 }), aggregator.view().minStepIdentifier());
+
+		// - subscriber and storage weren't called
+		EXPECT_TRUE(GetFinalizationSubscriberParams(context).empty());
+		EXPECT_TRUE(proofStorage.savedProofDescriptors().empty());
 	}
 
 	TEST(TEST_CLASS, MultiStepAggregatorServiceCountersAreUpdatedWhenMessageConsensusIsReached) {
 		// Arrange:
+		auto pProofStorage = std::make_unique<mocks::MockProofStorage>();
+		const auto& proofStorage = *pProofStorage;
+
 		TestContext context;
-		context.boot();
+		context.boot(std::move(pProofStorage));
 
 		auto hash = test::GenerateRandomByteArray<Hash256>();
-		auto pMessage1 = context.createMessage(VoterType::Large1, { 1, 2, 3 }, hash);
-		auto pMessage2 = context.createMessage(VoterType::Large2, { 1, 2, 3 }, hash);
+		auto pMessage1 = context.createMessage(VoterType::Large1, { 2, 3, 4 }, hash);
+		auto pMessage2 = context.createMessage(VoterType::Large2, { 2, 3, 4 }, hash);
 
 		// Act:
 		auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
@@ -223,14 +272,82 @@ namespace catapult { namespace finalization {
 		aggregator.modifier().add(pMessage2);
 
 		// - wait for message to be processed
-		WAIT_FOR_VALUE_EXPR(crypto::StepIdentifier({ 1, 2, 3 }), aggregator.view().minStepIdentifier());
+		WAIT_FOR_VALUE_EXPR(crypto::StepIdentifier({ 2, 3, 4 }), aggregator.view().minStepIdentifier());
 
 		// Assert:
 		EXPECT_EQ(1u, context.counter(Active_Steps_Counter_Name));
-		AssertStepIdentifierCounters(context, 1, 2, 3);
+		AssertStepIdentifierCounters(context, 2, 3, 4);
 
-		// Sanity:
-		EXPECT_EQ(crypto::StepIdentifier({ 1, 2, 3 }), aggregator.view().minStepIdentifier());
+		// - check aggregator
+		EXPECT_EQ(crypto::StepIdentifier({ 2, 3, 4 }), aggregator.view().minStepIdentifier());
+
+		// - subscriber was called
+		const auto& subscriberParams = GetFinalizationSubscriberParams(context);
+		ASSERT_EQ(1u, subscriberParams.size());
+		EXPECT_EQ(Height(2), subscriberParams[0].Height);
+		EXPECT_EQ(hash, subscriberParams[0].Hash);
+		EXPECT_EQ(FinalizationPoint(2), subscriberParams[0].Point);
+
+		// - storage was called
+		const auto& savedProofDescriptors = proofStorage.savedProofDescriptors();
+		ASSERT_EQ(1u, savedProofDescriptors.size());
+		EXPECT_EQ(Height(2), savedProofDescriptors[0].Height);
+		EXPECT_EQ(crypto::StepIdentifier({ 2, 3, 4 }), savedProofDescriptors[0].StepIdentifier);
+	}
+
+	TEST(TEST_CLASS, MultiStepAggregatorServiceCountersAreUpdatedWhenMessageConsensusIsReached_WhenLastFinalizedPointIsNotNemesis) {
+		// Arrange:
+		auto pProofStorage = std::make_unique<mocks::MockProofStorage>();
+		pProofStorage->setLastFinalization(FinalizationPoint(2), Height(3));
+		const auto& proofStorage = *pProofStorage;
+
+		GenerationHash lastFinalizedGenerationHash;
+		TestContext context;
+		{
+			auto pBlock3 = test::GenerateBlockWithTransactions(0, Height(3));
+			auto blockElement3 = test::BlockToBlockElement(*pBlock3);
+			lastFinalizedGenerationHash = blockElement3.GenerationHash;
+
+			// - set height to 3 (the last finalized block)
+			auto storageModifier = context.testState().state().storage().modifier();
+			storageModifier.saveBlock(test::BlockToBlockElement(*test::GenerateBlockWithTransactions(0, Height(2))));
+			storageModifier.saveBlock(blockElement3);
+			storageModifier.commit();
+		}
+
+		context.boot(std::move(pProofStorage));
+
+		auto hash = test::GenerateRandomByteArray<Hash256>();
+		auto pMessage1 = context.createMessage(VoterType::Large1, { 3, 6, 9 }, Height(5), hash, lastFinalizedGenerationHash);
+		auto pMessage2 = context.createMessage(VoterType::Large2, { 3, 6, 9 }, Height(5), hash, lastFinalizedGenerationHash);
+
+		// Act:
+		auto& aggregator = GetMultiStepFinalizationMessageAggregator(context.locator());
+		aggregator.modifier().add(pMessage1);
+		aggregator.modifier().add(pMessage2);
+
+		// - wait for message to be processed
+		WAIT_FOR_VALUE_EXPR(crypto::StepIdentifier({ 3, 6, 9 }), aggregator.view().minStepIdentifier());
+
+		// Assert:
+		EXPECT_EQ(1u, context.counter(Active_Steps_Counter_Name));
+		AssertStepIdentifierCounters(context, 3, 6, 9);
+
+		// - check aggregator
+		EXPECT_EQ(crypto::StepIdentifier({ 3, 6, 9 }), aggregator.view().minStepIdentifier());
+
+		// - subscriber was called
+		const auto& subscriberParams = GetFinalizationSubscriberParams(context);
+		ASSERT_EQ(1u, subscriberParams.size());
+		EXPECT_EQ(Height(5), subscriberParams[0].Height);
+		EXPECT_EQ(hash, subscriberParams[0].Hash);
+		EXPECT_EQ(FinalizationPoint(3), subscriberParams[0].Point);
+
+		// - storage was called
+		const auto& savedProofDescriptors = proofStorage.savedProofDescriptors();
+		ASSERT_EQ(1u, savedProofDescriptors.size());
+		EXPECT_EQ(Height(5), savedProofDescriptors[0].Height);
+		EXPECT_EQ(crypto::StepIdentifier({ 3, 6, 9 }), savedProofDescriptors[0].StepIdentifier);
 	}
 
 	// endregion

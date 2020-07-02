@@ -20,6 +20,7 @@
 
 #include "finalization/src/chain/MultiStepFinalizationMessageAggregator.h"
 #include "finalization/src/FinalizationConfiguration.h"
+#include "catapult/model/HeightHashPair.h"
 #include "finalization/tests/test/FinalizationMessageTestUtils.h"
 #include "tests/test/nodeps/LockTestUtils.h"
 #include "tests/TestHarness.h"
@@ -31,11 +32,14 @@ namespace catapult { namespace chain {
 	namespace {
 		using FP = FinalizationPoint;
 
+		constexpr auto Default_Height = Height(123);
+
 		// region ConsensusTuple(s)
 
 		struct ConsensusTuple {
 		public:
 			crypto::StepIdentifier StepIdentifier;
+			catapult::Height Height;
 			Hash256 Hash;
 			std::vector<Key> SignerPublicKeys;
 
@@ -45,7 +49,7 @@ namespace catapult { namespace chain {
 			}
 
 			friend std::ostream& operator<<(std::ostream& out, const ConsensusTuple& tuple) {
-				out << "step " << tuple.StepIdentifier << " hash " << tuple.Hash << " { ";
+				out << "step " << tuple.StepIdentifier << " height " << tuple.Height << " hash " << tuple.Hash << " { ";
 
 				for (const auto& publicKey : tuple.SignerPublicKeys)
 					out << publicKey << " ";
@@ -81,6 +85,10 @@ namespace catapult { namespace chain {
 				return m_hasConsensus;
 			}
 
+			Height consensusHeight() const override {
+				return m_consensusHeight;
+			}
+
 			Hash256 consensusHash() const override {
 				return m_consensusHash;
 			}
@@ -100,6 +108,7 @@ namespace catapult { namespace chain {
 
 				m_numVotes += numVotes;
 				if (m_numVotes >= m_config.Threshold) {
+					m_consensusHeight = message.Height;
 					m_consensusHash = *message.HashesPtr();
 					m_hasConsensus = true;
 				}
@@ -109,9 +118,10 @@ namespace catapult { namespace chain {
 			finalization::FinalizationConfiguration m_config;
 			crypto::StepIdentifier m_stepIdentifier;
 			bool m_hasConsensus;
-			Hash256 m_consensusHash;
-
 			uint64_t m_numVotes;
+
+			Height m_consensusHeight;
+			Hash256 m_consensusHash;
 			std::vector<std::pair<Key, uint64_t>> m_breadcrumbs;
 		};
 
@@ -172,6 +182,7 @@ namespace catapult { namespace chain {
 				m_hashes.push_back(test::GenerateRandomByteArray<Hash256>());
 
 				auto pMessage = test::CreateMessage(stepIdentifier, m_hashes.back());
+				pMessage->Height = Default_Height;
 				m_signerPublicKeys.push_back(GetSignerPublicKey(*pMessage));
 				m_messages.push_back(std::move(pMessage));
 
@@ -232,10 +243,11 @@ namespace catapult { namespace chain {
 			}
 
 			ConsensusSink createConsensusSink() {
-				return [&consensusTuples = m_consensusTuples](const auto& stepIdentifier, const auto& hash, const auto& proof) {
+				return [&consensusTuples = m_consensusTuples](const auto& stepIdentifier, const auto& heightHashPair, const auto& proof) {
 					ConsensusTuple consensusTuple;
 					consensusTuple.StepIdentifier = stepIdentifier;
-					consensusTuple.Hash = hash;
+					consensusTuple.Height = heightHashPair.Height;
+					consensusTuple.Hash = heightHashPair.Hash;
 
 					for (const auto& pMessage : proof)
 						consensusTuple.SignerPublicKeys.push_back(GetSignerPublicKey(*pMessage));
@@ -385,7 +397,7 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ Single_Step_Identifier, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 1, 2 }) }
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 1, 2 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -401,9 +413,9 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ Single_Step_Identifier, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
-			{ Single_Step_Identifier, messagesBuilder.hash(1), messagesBuilder.signerPublicKeys({ 0, 1 }) },
-			{ Single_Step_Identifier, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 1, 2 }) }
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(1), messagesBuilder.signerPublicKeys({ 0, 1 }) },
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 1, 2 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -421,7 +433,7 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ Single_Step_Identifier, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 2 }) }
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 2 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -466,7 +478,7 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ { 6, 4, 5 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -487,8 +499,8 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
-			{ { 6, 4, 5 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -510,8 +522,8 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
-			{ { 6, 8, 8 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 3 }) }
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 8, 8 }, Default_Height, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 3 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -531,7 +543,7 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ { 6, 4, 5 }, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 2 }) }
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 2 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -551,8 +563,8 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
-			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
-			{ { 6, 4, 5 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 0, 3 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -574,8 +586,8 @@ namespace catapult { namespace chain {
 
 		// - calculate expected consensus tuples before destroying builder
 		ConsensusTuples expectedConsensusTuples{
-			{ { 6, 4, 5 }, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
-			{ { 6, 8, 8 }, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 3 }) }
+			{ { 6, 4, 5 }, Default_Height, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ { 6, 8, 8 }, Default_Height, messagesBuilder.hash(3), messagesBuilder.signerPublicKeys({ 3 }) }
 		};
 
 		// Act:

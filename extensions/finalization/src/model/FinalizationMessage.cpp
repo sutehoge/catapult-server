@@ -68,6 +68,7 @@ namespace catapult { namespace model {
 			crypto::OtsTree& otsTree,
 			const crypto::KeyPair& vrfKeyPair,
 			const crypto::StepIdentifier& stepIdentifier,
+			Height height,
 			const HashRange& hashes,
 			const FinalizationContext& context) {
 		auto accountView = context.lookup(otsTree.rootPublicKey().copyTo<VotingKey>());
@@ -92,6 +93,7 @@ namespace catapult { namespace model {
 		pMessage->Size = messageSize;
 		pMessage->HashesCount = numHashes;
 		pMessage->StepIdentifier = stepIdentifier;
+		pMessage->Height = height;
 		pMessage->SortitionHashProof = sortitionHashProof;
 
 		auto* pHash = pMessage->HashesPtr();

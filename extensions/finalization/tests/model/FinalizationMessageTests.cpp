@@ -54,7 +54,7 @@ namespace catapult { namespace model {
 
 	// region FinalizationMessage (size + alignment)
 
-#define MESSAGE_FIELDS FIELD(HashesCount) FIELD(Signature) FIELD(StepIdentifier) FIELD(SortitionHashProof)
+#define MESSAGE_FIELDS FIELD(HashesCount) FIELD(Signature) FIELD(StepIdentifier) FIELD(Height) FIELD(SortitionHashProof)
 
 	TEST(TEST_CLASS, FinalizationMessageHasExpectedSize) {
 		// Arrange:
@@ -66,7 +66,7 @@ namespace catapult { namespace model {
 
 		// Assert:
 		EXPECT_EQ(expectedSize, sizeof(FinalizationMessage));
-		EXPECT_EQ(4 + 492u, sizeof(FinalizationMessage));
+		EXPECT_EQ(4 + 500u, sizeof(FinalizationMessage));
 	}
 
 	TEST(TEST_CLASS, FinalizationMessageHasProperAlignment) {
@@ -235,7 +235,7 @@ namespace catapult { namespace model {
 				auto hashes = test::GenerateRandomHashes(numHashes);
 
 				// Act:
-				auto pMessage = PrepareMessage(otsTree, keyPairDescriptor.VrfKeyPair, stepIdentifier, hashes, context);
+				auto pMessage = PrepareMessage(otsTree, keyPairDescriptor.VrfKeyPair, stepIdentifier, Height(987), hashes, context);
 
 				// Assert:
 				action(pMessage, context, hashes);
@@ -286,6 +286,7 @@ namespace catapult { namespace model {
 			EXPECT_EQ(0u, pMessage->HashesCount);
 
 			EXPECT_EQ(crypto::StepIdentifier({ 3, 4, 5 }), pMessage->StepIdentifier);
+			EXPECT_EQ(Height(987), pMessage->Height);
 			EXPECT_EQ(0u, FindFirstDifferenceIndex(hashes, ExtractHashes(*pMessage)));
 
 			// - check that the message is valid and can be processed
@@ -308,6 +309,7 @@ namespace catapult { namespace model {
 			EXPECT_EQ(3u, pMessage->HashesCount);
 
 			EXPECT_EQ(crypto::StepIdentifier({ 3, 4, 5 }), pMessage->StepIdentifier);
+			EXPECT_EQ(Height(987), pMessage->Height);
 			EXPECT_EQ(3u, FindFirstDifferenceIndex(hashes, ExtractHashes(*pMessage)));
 
 			// - check that the message is valid and can be processed
@@ -333,6 +335,7 @@ namespace catapult { namespace model {
 				// - create message
 				auto pMessage = CreateMessage(numHashes);
 				pMessage->StepIdentifier = { 3, 4, 5 };
+				pMessage->Height = Height(987);
 				test::SetMessageSortitionHashProof(*pMessage, keyPairDescriptor.VrfKeyPair, context.generationHash());
 				test::SignMessage(*pMessage, keyPairDescriptor.VotingKeyPair);
 

@@ -33,7 +33,13 @@ namespace catapult { namespace test {
 	// region message factories
 
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(const Hash256& hash) {
-		return CreateMessage({ Random(), Random(), Random() }, hash);
+		return CreateMessage(GenerateRandomValue<Height>(), hash);
+	}
+
+	std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, const Hash256& hash) {
+		auto pMessage = CreateMessage({ Random(), Random(), Random() }, hash);
+		pMessage->Height = height;
+		return pMessage;
 	}
 
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(const crypto::StepIdentifier& stepIdentifier, const Hash256& hash) {
@@ -51,9 +57,12 @@ namespace catapult { namespace test {
 
 	std::unique_ptr<model::FinalizationMessage> CreateValidMessage(
 			const crypto::StepIdentifier& stepIdentifier,
+			Height height,
 			const Hash256& hash,
 			const AccountKeyPairDescriptor& keyPairDescriptor) {
 		auto pMessage = CreateMessage(stepIdentifier, hash);
+		pMessage->Height = height;
+
 		auto nemesisGenerationHash = model::CalculateGenerationHash(GetNemesisBlock().GenerationHashProof.Gamma);
 
 		SetMessageSortitionHashProof(*pMessage, keyPairDescriptor.VrfKeyPair, nemesisGenerationHash);

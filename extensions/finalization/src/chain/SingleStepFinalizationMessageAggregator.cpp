@@ -21,6 +21,7 @@
 #include "SingleStepFinalizationMessageAggregator.h"
 #include "finalization/src/FinalizationConfiguration.h"
 #include "finalization/src/model/FinalizationMessage.h"
+#include "catapult/model/HeightHashPair.h"
 #include "catapult/utils/ArraySet.h"
 
 namespace catapult { namespace chain {
@@ -40,18 +41,23 @@ namespace catapult { namespace chain {
 				return m_hasConsensus;
 			}
 
+			Height consensusHeight() const override final {
+				return m_consensusHeightHashPair.Height;
+			}
+
 			Hash256 consensusHash() const override final {
-				return m_consensusHash;
+				return m_consensusHeightHashPair.Hash;
 			}
 
 		public:
 			void add(const model::FinalizationMessage& message, uint64_t numVotes) override final {
-				add(m_config, message.Signature.Root.ParentPublicKey, *message.HashesPtr(), numVotes);
+				model::HeightHashPair heightHashPair{ message.Height, *message.HashesPtr() };
+				add(m_config, message.Signature.Root.ParentPublicKey, heightHashPair, numVotes);
 			}
 
 		protected:
-			void setConsensusHash(const Hash256& hash) {
-				m_consensusHash = hash;
+			void setConsensus(const model::HeightHashPair& heightHashPair) {
+				m_consensusHeightHashPair = heightHashPair;
 				m_hasConsensus = true;
 			}
 
@@ -59,13 +65,13 @@ namespace catapult { namespace chain {
 			virtual void add(
 					const finalization::FinalizationConfiguration& config,
 					const Key& votingPublicKey,
-					const Hash256& hash,
+					const model::HeightHashPair& heightHashPair,
 					uint64_t numVotes) = 0;
 
 		private:
 			finalization::FinalizationConfiguration m_config;
 			bool m_hasConsensus;
-			Hash256 m_consensusHash;
+			model::HeightHashPair m_consensusHeightHashPair;
 		};
 	}
 
@@ -74,6 +80,12 @@ namespace catapult { namespace chain {
 	// region FinalizationMessageCountVotesAggregator
 
 	namespace {
+		struct HeightHashPairHasher {
+			size_t operator()(const model::HeightHashPair& heightHashPair) const {
+				return utils::ArrayHasher<Hash256>()(heightHashPair.Hash);
+			}
+		};
+
 		class FinalizationMessageCountVotesAggregator : public BasicFinalizationMessageAggregator {
 		public:
 			explicit FinalizationMessageCountVotesAggregator(const finalization::FinalizationConfiguration& config)
@@ -84,20 +96,20 @@ namespace catapult { namespace chain {
 			void add(
 					const finalization::FinalizationConfiguration& config,
 					const Key& votingPublicKey,
-					const Hash256& hash,
+					const model::HeightHashPair& heightHashPair,
 					uint64_t numVotes) override {
 				if (hasConsensus() || !m_votingPublicKeys.insert(&votingPublicKey).second)
 					return;
 
-				auto hashVoteMapIter = m_hashVoteMap.emplace(hash, 0).first;
-				hashVoteMapIter->second += numVotes;
+				auto voteMapIter = m_voteMap.emplace(heightHashPair, 0).first;
+				voteMapIter->second += numVotes;
 
-				if (hashVoteMapIter->second >= config.Threshold)
-					setConsensusHash(hash);
+				if (voteMapIter->second >= config.Threshold)
+					setConsensus(heightHashPair);
 			}
 
 		private:
-			std::unordered_map<Hash256, uint64_t, utils::ArrayHasher<Hash256>> m_hashVoteMap;
+			std::unordered_map<model::HeightHashPair, uint64_t, HeightHashPairHasher> m_voteMap;
 			utils::KeyPointerSet m_votingPublicKeys;
 		};
 	}
@@ -119,9 +131,11 @@ namespace catapult { namespace chain {
 		public:
 			FinalizationMessageCommonBlockAggregator(
 					const finalization::FinalizationConfiguration& config,
-					const std::vector<Hash256>& hashes)
+					const std::vector<Hash256>& hashes,
+					Height height)
 					: BasicFinalizationMessageAggregator(config)
 					, m_hashes(hashes)
+					, m_height(height)
 					, m_hashVotes(m_hashes.size(), 0)
 					, m_consensusHashIndex(0)
 			{}
@@ -130,9 +144,9 @@ namespace catapult { namespace chain {
 			void add(
 					const finalization::FinalizationConfiguration& config,
 					const Key& votingPublicKey,
-					const Hash256& hash,
+					const model::HeightHashPair& heightHashPair,
 					uint64_t numVotes) override {
-				auto hashIndex = findIndex(hash);
+				auto hashIndex = findIndex(heightHashPair);
 				auto publicKeyHashIndexMapInsertResult = m_publicKeyHashIndexMap.emplace(&votingPublicKey, hashIndex);
 				if (Not_Found == hashIndex)
 					return;
@@ -152,9 +166,13 @@ namespace catapult { namespace chain {
 			}
 
 		private:
-			size_t findIndex(const Hash256& searchHash) const {
-				auto iter = std::find(m_hashes.cbegin(), m_hashes.cend(), searchHash);
-				return m_hashes.cend() == iter ? Not_Found : static_cast<size_t>(std::distance(m_hashes.cbegin(), iter));
+			size_t findIndex(const model::HeightHashPair& heightHashPair) const {
+				auto iter = std::find(m_hashes.cbegin(), m_hashes.cend(), heightHashPair.Hash);
+				if (m_hashes.cend() == iter)
+					return Not_Found;
+
+				auto index = static_cast<size_t>(std::distance(m_hashes.cbegin(), iter));
+				return m_height + Height(index) == heightHashPair.Height ? index : Not_Found;
 			}
 
 			void incrementVotes(
@@ -168,7 +186,7 @@ namespace catapult { namespace chain {
 					auto hashIndex = i - 1;
 					m_hashVotes[hashIndex] += numVotes;
 					if (m_hashVotes[hashIndex] >= config.Threshold) {
-						setConsensusHash(m_hashes[hashIndex]);
+						setConsensus({ m_height + Height(hashIndex), m_hashes[hashIndex] });
 						m_consensusHashIndex = hashIndex;
 						return;
 					}
@@ -177,6 +195,8 @@ namespace catapult { namespace chain {
 
 		private:
 			std::vector<Hash256> m_hashes;
+			Height m_height;
+
 			std::vector<uint64_t> m_hashVotes;
 			size_t m_consensusHashIndex;
 
@@ -191,8 +211,9 @@ namespace catapult { namespace chain {
 
 	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCommonBlockAggregator(
 			const finalization::FinalizationConfiguration& config,
-			const std::vector<Hash256>& hashes) {
-		return std::make_unique<FinalizationMessageCommonBlockAggregator>(config, hashes);
+			const std::vector<Hash256>& hashes,
+			Height height) {
+		return std::make_unique<FinalizationMessageCommonBlockAggregator>(config, hashes, height);
 	}
 
 	// endregion

@@ -101,7 +101,7 @@ namespace catapult { namespace test {
 				TestUtils::VoterType voterType,
 				const crypto::StepIdentifier& stepIdentifier,
 				const Hash256& hash) {
-			return CreateValidMessage(stepIdentifier, hash, m_keyPairDescriptors[utils::to_underlying_type(voterType)]);
+			return CreateValidMessage(stepIdentifier, Height(2), hash, m_keyPairDescriptors[utils::to_underlying_type(voterType)]);
 		}
 
 	private:

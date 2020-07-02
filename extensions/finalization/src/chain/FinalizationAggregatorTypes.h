@@ -24,7 +24,10 @@
 #include "catapult/functions.h"
 #include <vector>
 
-namespace catapult { namespace crypto { struct StepIdentifier; } }
+namespace catapult {
+	namespace crypto { struct StepIdentifier; }
+	namespace model { struct HeightHashPair; }
+}
 
 namespace catapult { namespace chain {
 
@@ -40,5 +43,5 @@ namespace catapult { namespace chain {
 	>;
 
 	/// Callback called when consensus is reached.
-	using ConsensusSink = consumer<const crypto::StepIdentifier&, const Hash256&, const FinalizationProof&>;
+	using ConsensusSink = consumer<const crypto::StepIdentifier&, const model::HeightHashPair&, const FinalizationProof&>;
 }}

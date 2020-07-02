@@ -38,12 +38,13 @@ namespace catapult { namespace chain {
 			return config;
 		}
 
-		std::unique_ptr<model::FinalizationMessage> CreateMessage(const Hash256& hash) {
-			return test::CreateMessage(hash);
+		std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, const Hash256& hash) {
+			return test::CreateMessage(height, hash);
 		}
 
 		void AssertNoConsensus(const SingleStepFinalizationMessageAggregator& aggregator, const std::string& message = "") {
 			EXPECT_FALSE(aggregator.hasConsensus()) << message;
+			EXPECT_EQ(Height(), aggregator.consensusHeight()) << message;
 			EXPECT_EQ(Hash256(), aggregator.consensusHash()) << message;
 		}
 
@@ -56,7 +57,8 @@ namespace catapult { namespace chain {
 		struct CountVotesTraits {
 			static auto CreateFinalizationMessageAggregator(
 					const finalization::FinalizationConfiguration& config,
-					const std::vector<Hash256>&) {
+					const std::vector<Hash256>&,
+					Height) {
 				return CreateFinalizationMessageCountVotesAggregator(config);
 			}
 		};
@@ -81,7 +83,7 @@ namespace catapult { namespace chain {
 		auto config = CreateConfiguration(2000, 3000);
 
 		// Act:
-		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, test::GenerateRandomDataVector<Hash256>(3));
+		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, test::GenerateRandomDataVector<Hash256>(3), Height(101));
 
 		// Assert:
 		AssertNoConsensus(*pAggregator);
@@ -97,9 +99,9 @@ namespace catapult { namespace chain {
 			// Arrange:
 			auto config = CreateConfiguration(2000, 3000);
 			auto hashes = test::GenerateRandomDataVector<Hash256>(3);
-			auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes);
+			auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
 
-			auto pMessage = CreateMessage(hashes[1]);
+			auto pMessage = CreateMessage(Height(102), hashes[1]);
 
 			// Act:
 			pAggregator->add(*pMessage, numVotes);
@@ -113,15 +115,16 @@ namespace catapult { namespace chain {
 			// Arrange:
 			auto config = CreateConfiguration(2000, 3000);
 			auto hashes = test::GenerateRandomDataVector<Hash256>(3);
-			auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes);
+			auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
 
-			auto pMessage = CreateMessage(hashes[1]);
+			auto pMessage = CreateMessage(Height(102), hashes[1]);
 
 			// Act:
 			pAggregator->add(*pMessage, numVotes);
 
 			// Assert:
 			EXPECT_TRUE(pAggregator->hasConsensus()) << numVotes;
+			EXPECT_EQ(Height(102), pAggregator->consensusHeight()) << numVotes;
 			EXPECT_EQ(hashes[1], pAggregator->consensusHash()) << numVotes;
 		}
 	}
@@ -147,14 +150,14 @@ namespace catapult { namespace chain {
 
 	// region multiple messages (all)
 
-	AGGREGATOR_TEST(MessageVotesAreAdditive) {
+	AGGREGATOR_TEST(MessageVotesAreAdditiveWhenBothHeightAndHashMatch) {
 		// Arrange:
 		auto config = CreateConfiguration(2000, 3000);
 		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
-		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes);
+		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
 
-		auto pMessage1 = CreateMessage(hashes[1]);
-		auto pMessage2 = CreateMessage(hashes[1]);
+		auto pMessage1 = CreateMessage(Height(102), hashes[1]);
+		auto pMessage2 = CreateMessage(Height(102), hashes[1]);
 
 		pAggregator->add(*pMessage1, 1100);
 
@@ -166,17 +169,54 @@ namespace catapult { namespace chain {
 
 		// Assert: 2100 > 2000
 		EXPECT_TRUE(pAggregator->hasConsensus());
+		EXPECT_EQ(Height(102), pAggregator->consensusHeight());
 		EXPECT_EQ(hashes[1], pAggregator->consensusHash());
+	}
+
+	AGGREGATOR_TEST(MessageVotesAreNotAdditiveWhenOnlyHeightMatchs) {
+		// Arrange:
+		auto config = CreateConfiguration(2000, 3000);
+		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
+
+		auto pMessage1 = CreateMessage(Height(102), hashes[0]);
+		auto pMessage2 = CreateMessage(Height(102), hashes[1]);
+
+		pAggregator->add(*pMessage1, 1100);
+
+		// Act:
+		pAggregator->add(*pMessage2, 1000);
+
+		// Assert:
+		AssertNoConsensus(*pAggregator);
+	}
+
+	AGGREGATOR_TEST(MessageVotesAreNotAdditiveWhenOnlyHashMatchs) {
+		// Arrange:
+		auto config = CreateConfiguration(2000, 3000);
+		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
+
+		auto pMessage1 = CreateMessage(Height(101), hashes[1]);
+		auto pMessage2 = CreateMessage(Height(102), hashes[1]);
+
+		pAggregator->add(*pMessage1, 1100);
+
+		// Act:
+		pAggregator->add(*pMessage2, 1000);
+
+		// Assert:
+		AssertNoConsensus(*pAggregator);
 	}
 
 	AGGREGATOR_TEST(RedundantVotesAreIgnored) {
 		// Arrange:
 		auto config = CreateConfiguration(2000, 3000);
 		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
-		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes);
+		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
 
-		auto pMessage1 = CreateMessage(hashes[1]);
-		auto pMessage2 = CreateMessage(hashes[1]);
+		auto pMessage1 = CreateMessage(Height(102), hashes[1]);
+		auto pMessage2 = CreateMessage(Height(102), hashes[1]);
 		pMessage2->Signature.Root.ParentPublicKey = pMessage1->Signature.Root.ParentPublicKey;
 
 		// Act:
@@ -191,10 +231,10 @@ namespace catapult { namespace chain {
 		// Arrange:
 		auto config = CreateConfiguration(2000, 3000);
 		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
-		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes);
+		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
 
-		auto pMessage1 = CreateMessage(test::GenerateRandomByteArray<Hash256>());
-		auto pMessage2 = CreateMessage(hashes[1]);
+		auto pMessage1 = CreateMessage(Height(102), test::GenerateRandomByteArray<Hash256>());
+		auto pMessage2 = CreateMessage(Height(102), hashes[1]);
 		pMessage2->Signature.Root.ParentPublicKey = pMessage1->Signature.Root.ParentPublicKey;
 
 		// Act:
@@ -215,8 +255,8 @@ namespace catapult { namespace chain {
 		auto pAggregator = CreateFinalizationMessageCountVotesAggregator(config);
 
 		auto hash = test::GenerateRandomByteArray<Hash256>();
-		auto pMessage1 = CreateMessage(hash);
-		auto pMessage2 = CreateMessage(test::GenerateRandomByteArray<Hash256>());
+		auto pMessage1 = CreateMessage(Height(102), hash);
+		auto pMessage2 = CreateMessage(Height(103), test::GenerateRandomByteArray<Hash256>());
 
 		// Act:
 		pAggregator->add(*pMessage1, 2100);
@@ -224,6 +264,7 @@ namespace catapult { namespace chain {
 
 		// Assert:
 		EXPECT_TRUE(pAggregator->hasConsensus());
+		EXPECT_EQ(Height(102), pAggregator->consensusHeight());
 		EXPECT_EQ(hash, pAggregator->consensusHash());
 	}
 
@@ -236,11 +277,11 @@ namespace catapult { namespace chain {
 			// Arrange:
 			auto config = CreateConfiguration(2000, 3000);
 			auto hashes = test::GenerateRandomDataVector<Hash256>(3 + delta);
-			auto pAggregator = CreateFinalizationMessageCommonBlockAggregator(config, hashes);
+			auto pAggregator = CreateFinalizationMessageCommonBlockAggregator(config, hashes, Height(101));
 
-			auto pMessage1 = CreateMessage(hashes[2 + delta]);
-			auto pMessage2 = CreateMessage(hashes[1 + delta]);
-			auto pMessage3 = CreateMessage(hashes[1]);
+			auto pMessage1 = CreateMessage(Height(101 + 2 + delta), hashes[2 + delta]);
+			auto pMessage2 = CreateMessage(Height(101 + 1 + delta), hashes[1 + delta]);
+			auto pMessage3 = CreateMessage(Height(102), hashes[1]);
 
 			if (shouldReuseVoter)
 				pMessage3->Signature.Root.ParentPublicKey = pMessage2->Signature.Root.ParentPublicKey;
@@ -252,6 +293,7 @@ namespace catapult { namespace chain {
 
 			// Assert:
 			EXPECT_TRUE(pAggregator->hasConsensus());
+			EXPECT_EQ(Height(101 + 1 + delta), pAggregator->consensusHeight());
 			EXPECT_EQ(hashes[1 + delta], pAggregator->consensusHash());
 		}
 	}
@@ -271,11 +313,11 @@ namespace catapult { namespace chain {
 			// Arrange:
 			auto config = CreateConfiguration(2000, 3000);
 			auto hashes = test::GenerateRandomDataVector<Hash256>(3 + delta);
-			auto pAggregator = CreateFinalizationMessageCommonBlockAggregator(config, hashes);
+			auto pAggregator = CreateFinalizationMessageCommonBlockAggregator(config, hashes, Height(101));
 
-			auto pMessage1 = CreateMessage(hashes[1 + delta]);
-			auto pMessage2 = CreateMessage(hashes[1]);
-			auto pMessage3 = CreateMessage(hashes[2 + delta]);
+			auto pMessage1 = CreateMessage(Height(101 + 1 + delta), hashes[1 + delta]);
+			auto pMessage2 = CreateMessage(Height(102), hashes[1]);
+			auto pMessage3 = CreateMessage(Height(101 + 2 + delta), hashes[2 + delta]);
 
 			if (shouldReuseVoter)
 				pMessage3->Signature.Root.ParentPublicKey = pMessage2->Signature.Root.ParentPublicKey;
@@ -287,6 +329,7 @@ namespace catapult { namespace chain {
 
 			// Assert:
 			EXPECT_TRUE(pAggregator->hasConsensus());
+			EXPECT_EQ(Height(101 + 1 + delta), pAggregator->consensusHeight());
 			EXPECT_EQ(hashes[1 + delta], pAggregator->consensusHash());
 		}
 	}
@@ -299,6 +342,31 @@ namespace catapult { namespace chain {
 	TEST(TEST_CLASS, ConsensusCanBeChangedToLaterHashSameVoter_CommonBlock) {
 		AssertConsensusCanBeChangedToLaterHash(true, 0);
 		AssertConsensusCanBeChangedToLaterHash(true, 10);
+	}
+
+	namespace {
+		void AssertCommonBlockCannotReachConsensusForHashAtUnexpectedHeight(Height height) {
+			// Arrange:
+			auto config = CreateConfiguration(2000, 3000);
+			auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+			auto pAggregator = CreateFinalizationMessageCommonBlockAggregator(config, hashes, Height(101));
+
+			auto pMessage1 = CreateMessage(height, hashes[1]);
+			auto pMessage2 = CreateMessage(height, hashes[1]);
+
+			pAggregator->add(*pMessage1, 1100);
+
+			// Act:
+			pAggregator->add(*pMessage2, 1000);
+
+			// Assert:
+			AssertNoConsensus(*pAggregator);
+		}
+	}
+
+	TEST(TEST_CLASS, ConsensusCanNotBeReachedForHashAtUnexpectedHeight_CommonBlock) {
+		AssertCommonBlockCannotReachConsensusForHashAtUnexpectedHeight(Height(101));
+		AssertCommonBlockCannotReachConsensusForHashAtUnexpectedHeight(Height(103));
 	}
 
 	// endregion

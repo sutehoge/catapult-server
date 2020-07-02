@@ -51,6 +51,9 @@ namespace catapult { namespace model {
 		/// Step identifer.
 		crypto::StepIdentifier StepIdentifier;
 
+		/// Block height corresponding to the the first hash.
+		catapult::Height Height;
+
 		/// Sortition hash proof.
 		crypto::VrfProof SortitionHashProof;
 
@@ -88,12 +91,13 @@ namespace catapult { namespace model {
 
 	// region PrepareMessage
 
-	/// Prepares a finalization message given \a otsTree, \a vrfKeyPair, \a stepIdentifier, \a hashes and \a context.
+	/// Prepares a finalization message given \a otsTree, \a vrfKeyPair, \a stepIdentifier, \a height, \a hashes and \a context.
 	/// \note If parameters don't yield a voting selection, \c nullptr will be returned.
 	std::unique_ptr<FinalizationMessage> PrepareMessage(
 			crypto::OtsTree& otsTree,
 			const crypto::KeyPair& vrfKeyPair,
 			const crypto::StepIdentifier& stepIdentifier,
+			Height height,
 			const HashRange& hashes,
 			const FinalizationContext& context);
 

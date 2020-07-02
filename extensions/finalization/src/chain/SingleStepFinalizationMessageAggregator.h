@@ -39,6 +39,9 @@ namespace catapult { namespace chain {
 		/// Returns \c true if consensus has been reached.
 		virtual bool hasConsensus() const = 0;
 
+		/// Gets the consensus height.
+		virtual Height consensusHeight() const = 0;
+
 		/// Gets the consensus hash.
 		virtual Hash256 consensusHash() const = 0;
 
@@ -52,8 +55,10 @@ namespace catapult { namespace chain {
 	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCountVotesAggregator(
 			const finalization::FinalizationConfiguration& config);
 
-	/// Creates a finalization message aggregator that attempts to reach consensus on block hash given \a config and \a hashes.
+	/// Creates a finalization message aggregator that attempts to reach consensus on a block hash given \a config and \a hashes
+	/// starting at \a height.
 	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCommonBlockAggregator(
 			const finalization::FinalizationConfiguration& config,
-			const std::vector<Hash256>& hashes);
+			const std::vector<Hash256>& hashes,
+			Height height);
 }}

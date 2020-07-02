@@ -19,6 +19,7 @@
 **/
 
 #include "MultiStepFinalizationMessageAggregator.h"
+#include "catapult/model/HeightHashPair.h"
 
 namespace catapult { namespace chain {
 
@@ -165,6 +166,12 @@ namespace catapult { namespace chain {
 		return m_state.NextFinalizationPoint == FinalizationPoint(stepIdentifier.Point) && stepIdentifier >= m_state.MinStepIdentifier;
 	}
 
+	namespace {
+		model::HeightHashPair GetConsensusHeightHashPair(const SingleStepFinalizationMessageAggregator& aggregator) {
+			return { aggregator.consensusHeight(), aggregator.consensusHash() };
+		}
+	}
+
 	bool MultiStepFinalizationMessageAggregatorModifier::add(
 			StepDataTuple& stepDataTuple,
 			const model::FinalizationMessage& message,
@@ -173,7 +180,7 @@ namespace catapult { namespace chain {
 		if (!stepDataTuple.pAggregator->hasConsensus())
 			return false;
 
-		m_state.ConsensusSink(message.StepIdentifier, stepDataTuple.pAggregator->consensusHash(), stepDataTuple.Proof);
+		m_state.ConsensusSink(message.StepIdentifier, GetConsensusHeightHashPair(*stepDataTuple.pAggregator), stepDataTuple.Proof);
 		return true;
 	}
 

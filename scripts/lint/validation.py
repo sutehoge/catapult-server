@@ -348,6 +348,7 @@ class TypoChecker(SimpleValidator):
             re.compile(r'(\d|0x[0-9a-fA-F]+)u\)'): 'no need for explicit unsigned qualifier',
             re.compile(r';;$'): 'no double semicolons',
             re.compile(r'[a-zA-Z>\*]>[^&\n]*= {'): 'prefer container initialization to container assign',
+            re.compile(r'^\t*(static )?(const(expr)? )?[a-zA-Z:_]+ [a-zA-Z_]+ = {'): 'prefer struct initialization to struct assign',
             re.compile(r'(/\*+|///?) (The|An?) [^=]'): 'documentation should not start with \'The\' or `A(n)`',
             re.compile(r'::(En|Dis)able[^d]'): 'enum values should be named Enable*d/Disable*d',
             re.compile(r', and'): 'rephrase to avoid \', and\'',

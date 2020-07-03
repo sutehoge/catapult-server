@@ -69,6 +69,31 @@ namespace catapult { namespace io {
 		return m_hashFile.loadRangeFrom(point, numHashes);
 	}
 
+	namespace {
+		std::shared_ptr<model::PackedFinalizationProof> ReadPackedFinalizationProof(RawFile& proofFile) {
+			auto size = Read32(proofFile);
+			proofFile.seek(0);
+
+			auto pProof = utils::MakeSharedWithSize<model::PackedFinalizationProof>(size);
+			pProof->Size = size;
+			proofFile.read({ reinterpret_cast<uint8_t*>(pProof.get()), size });
+			return pProof;
+		}
+	}
+
+	std::shared_ptr<const model::PackedFinalizationProof> FileProofStorage::loadProof(FinalizationPoint point) const {
+		auto currentPoint = finalizationPoint();
+
+		if (currentPoint < point) {
+			std::ostringstream out;
+			out << "cannot load proof with point " << point << " when storage point is " << currentPoint;
+			CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
+		}
+
+		auto pProofFile = OpenProofFile(m_dataDirectory, point);
+		return ReadPackedFinalizationProof(*pProofFile);
+	}
+
 	void FileProofStorage::saveProof(Height height, const chain::FinalizationProof& proof) {
 		if (proof.empty())
 			CATAPULT_THROW_INVALID_ARGUMENT("cannot save empty proof");
@@ -110,30 +135,5 @@ namespace catapult { namespace io {
 
 		m_heightIndexFile.set(height.unwrap());
 		m_indexFile.set(messagePoint.unwrap());
-	}
-
-	namespace {
-		std::shared_ptr<model::PackedFinalizationProof> ReadPackedFinalizationProof(RawFile& proofFile) {
-			auto size = Read32(proofFile);
-			proofFile.seek(0);
-
-			auto pProof = utils::MakeSharedWithSize<model::PackedFinalizationProof>(size);
-			pProof->Size = size;
-			proofFile.read({ reinterpret_cast<uint8_t*>(pProof.get()), size });
-			return pProof;
-		}
-	}
-
-	std::shared_ptr<const model::PackedFinalizationProof> FileProofStorage::loadProof(FinalizationPoint point) const {
-		auto currentPoint = finalizationPoint();
-
-		if (currentPoint < point) {
-			std::ostringstream out;
-			out << "cannot load proof with point " << point << " when storage point is " << currentPoint;
-			CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
-		}
-
-		auto pProofFile = OpenProofFile(m_dataDirectory, point);
-		return ReadPackedFinalizationProof(*pProofFile);
 	}
 }}

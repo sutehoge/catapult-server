@@ -41,10 +41,10 @@ namespace catapult { namespace io {
 		/// Gets a range of at most \a maxHashes height-hash pairs starting at \a point.
 		virtual model::HeightHashPairRange loadFinalizedHashesFrom(FinalizationPoint point, size_t maxHashes) const = 0;
 
-		/// Saves finalization \a proof of block at \a height.
-		virtual void saveProof(Height height, const chain::FinalizationProof& proof) = 0;
-
 		/// Gets the finalization proof at \a point.
 		virtual std::shared_ptr<const model::PackedFinalizationProof> loadProof(FinalizationPoint point) const = 0;
+
+		/// Saves finalization \a proof of block at \a height.
+		virtual void saveProof(Height height, const chain::FinalizationProof& proof) = 0;
 	};
 }}

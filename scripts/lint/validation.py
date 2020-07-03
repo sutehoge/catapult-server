@@ -348,7 +348,6 @@ class TypoChecker(SimpleValidator):
             re.compile(r'(\d|0x[0-9a-fA-F]+)u\)'): 'no need for explicit unsigned qualifier',
             re.compile(r';;$'): 'no double semicolons',
             re.compile(r'[a-zA-Z>\*]>[^&\n]*= {'): 'prefer container initialization to container assign',
-            re.compile(r'^\t*(static )?(const(expr)? )?[a-zA-Z:_]+ [a-zA-Z_]+ = {'): 'prefer struct initialization to struct assign',
             re.compile(r'(/\*+|///?) (The|An?) [^=]'): 'documentation should not start with \'The\' or `A(n)`',
             re.compile(r'::(En|Dis)able[^d]'): 'enum values should be named Enable*d/Disable*d',
             re.compile(r', and'): 'rephrase to avoid \', and\'',
@@ -604,6 +603,8 @@ class MultiConditionChecker(SimpleValidator):
 
         self.patternTrailingOperator = re.compile(r' (\+|-|\*|/|%|&|\||^|<<|>>)\s*$')
 
+        self.patternStructAssignment = re.compile(r'^\t*(static )?(const(expr)? )?([a-zA-Z:_]+) [a-zA-Z_]+ = {')
+
         self.errors = {
             self.checkTestLine: 'TEST should use TEST_CLASS',
             self.checkExplicitOperatorBool: 'Missing explicit before operator bool',
@@ -622,7 +623,8 @@ class MultiConditionChecker(SimpleValidator):
             self.checkCppDoxygenComment: '/// unexpected in cpp file',
             self.checkAutoContextParam: 'use type name instead of auto',
             self.checkGetsSetsDocumentation: 'add an article to documentation',
-            self.checkTrailingOperator: 'operators should start lines, not finish them'
+            self.checkTrailingOperator: 'operators should start lines, not finish them',
+            self.checkStructAssignment: 'prefer struct initialization to struct assign',
         }
 
     def reset(self, path, errorReporter):
@@ -756,6 +758,14 @@ class MultiConditionChecker(SimpleValidator):
     def checkTrailingOperator(self, line, _):
         # not part of SimpleValidator because comments and strings should be removed before applying rule
         return self.patternTrailingOperator.search(line)
+
+    def checkStructAssignment(self, line, _):
+        match = self.patternStructAssignment.match(line)
+        if match:
+            # treat auto assignments as valid ones (`auto foo = { ...}`)
+            return 'auto' != match.group(4)
+
+        return False
 
     def check(self, lineNumber, line):
         strippedLine = stripCommentsAndStrings(line)

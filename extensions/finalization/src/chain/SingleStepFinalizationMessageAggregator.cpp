@@ -50,6 +50,10 @@ namespace catapult { namespace chain {
 			}
 
 		public:
+			void reduce(FinalizationProof&) override {
+				// by default, don't reduce and preserve all messages
+			}
+
 			void add(const model::FinalizationMessage& message, uint64_t numVotes) override final {
 				model::HeightHashPair heightHashPair{ message.Height, *message.HashesPtr() };
 				add(m_config, message.Signature.Root.ParentPublicKey, heightHashPair, numVotes);
@@ -73,6 +77,55 @@ namespace catapult { namespace chain {
 			bool m_hasConsensus;
 			model::HeightHashPair m_consensusHeightHashPair;
 		};
+	}
+
+	// endregion
+
+	// region FinalizationMessageMaximumVotesAggregator
+
+	namespace {
+		class FinalizationMessageMaximumVotesAggregator : public BasicFinalizationMessageAggregator {
+		public:
+			explicit FinalizationMessageMaximumVotesAggregator(const finalization::FinalizationConfiguration& config)
+					: BasicFinalizationMessageAggregator(config)
+					, m_maxVotes(0)
+			{}
+
+		public:
+			void reduce(FinalizationProof& proof) override {
+				auto iter = std::find_if(proof.cbegin(), proof.cend(), [&searchPublicKey = m_bestVotingPublicKey](const auto& pMessage) {
+					return searchPublicKey == pMessage->Signature.Root.ParentPublicKey;
+				});
+
+				auto pMessage = proof.cend() != iter ? *iter : FinalizationProof::value_type();
+				proof.clear();
+
+				if (pMessage)
+					proof.push_back(pMessage);
+			}
+
+			void add(
+					const finalization::FinalizationConfiguration&,
+					const Key& votingPublicKey,
+					const model::HeightHashPair& heightHashPair,
+					uint64_t numVotes) override {
+				if (numVotes <= m_maxVotes)
+					return;
+
+				m_maxVotes = numVotes;
+				m_bestVotingPublicKey = votingPublicKey;
+				setConsensus(heightHashPair);
+			}
+
+		private:
+			uint64_t m_maxVotes;
+			Key m_bestVotingPublicKey;
+		};
+	}
+
+	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageMaximumVotesAggregator(
+			const finalization::FinalizationConfiguration& config) {
+		return std::make_unique<FinalizationMessageMaximumVotesAggregator>(config);
 	}
 
 	// endregion

@@ -63,6 +63,12 @@ namespace catapult { namespace test {
 	/// Signs \a message with \a votingKeyPair.
 	void SignMessage(model::FinalizationMessage& message, const crypto::KeyPair& votingKeyPair);
 
+	/// Asserts that \a expected and \a actual are equal with optional \a message.
+	void AssertEqualMessage(
+			const model::FinalizationMessage& expected,
+			const model::FinalizationMessage& actual,
+			const std::string& message = std::string());
+
 	// endregion
 
 	// region account state cache utils

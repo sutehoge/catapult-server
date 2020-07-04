@@ -180,6 +180,7 @@ namespace catapult { namespace chain {
 		if (!stepDataTuple.pAggregator->hasConsensus())
 			return false;
 
+		stepDataTuple.pAggregator->reduce(stepDataTuple.Proof);
 		m_state.ConsensusSink(message.StepIdentifier, GetConsensusHeightHashPair(*stepDataTuple.pAggregator), stepDataTuple.Proof);
 		return true;
 	}

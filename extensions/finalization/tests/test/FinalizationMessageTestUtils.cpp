@@ -27,6 +27,7 @@
 #include "tests/test/nodeps/KeyTestUtils.h"
 #include "tests/test/nodeps/Nemesis.h"
 #include "tests/test/nodeps/Random.h"
+#include "tests/TestHarness.h"
 
 namespace catapult { namespace test {
 
@@ -97,6 +98,14 @@ namespace catapult { namespace test {
 			reinterpret_cast<const uint8_t*>(&message) + model::FinalizationMessage::Header_Size,
 			message.Size - model::FinalizationMessage::Header_Size
 		});
+	}
+
+	void AssertEqualMessage(
+			const model::FinalizationMessage& expected,
+			const model::FinalizationMessage& actual,
+			const std::string& message) {
+		ASSERT_EQ(expected.Size, actual.Size) << message;
+		EXPECT_EQ_MEMORY(&expected, &actual, expected.Size) << message;
 	}
 
 	// endregion

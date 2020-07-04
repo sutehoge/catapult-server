@@ -51,7 +51,137 @@ namespace catapult { namespace chain {
 		// endregion
 	}
 
-	// region traits
+	// region constructor (MaximumVotes)
+
+#define MAXIMUM_VOTES_TEST(TEST_NAME) TEST(TEST_CLASS, TEST_NAME##_MaximumVotes)
+
+	MAXIMUM_VOTES_TEST(InitiallyNoConsensusIsPresent) {
+		// Arrange:
+		auto config = CreateConfiguration(2000, 3000);
+
+		// Act:
+		auto pAggregator = CreateFinalizationMessageMaximumVotesAggregator(config);
+
+		// Assert:
+		AssertNoConsensus(*pAggregator);
+	}
+
+	// endregion
+
+	// region add (MaximumVotes)
+
+	MAXIMUM_VOTES_TEST(ConsensusIsReachedAfterAnyMessage) {
+		// Arrange:
+		auto config = CreateConfiguration(2000, 3000);
+		auto pAggregator = CreateFinalizationMessageMaximumVotesAggregator(config);
+
+		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+		auto pMessage = CreateMessage(Height(102), hashes[1]);
+
+		// Act:
+		pAggregator->add(*pMessage, 1);
+
+		// Assert:
+		EXPECT_TRUE(pAggregator->hasConsensus());
+		EXPECT_EQ(Height(102), pAggregator->consensusHeight());
+		EXPECT_EQ(hashes[1], pAggregator->consensusHash());
+	}
+
+	namespace {
+		void AssertMaximumVotesConsensus(uint64_t numVotes1, uint64_t numVotes2, size_t expectedHashIndex) {
+			// Arrange:
+			auto config = CreateConfiguration(2000, 3000);
+			auto pAggregator = CreateFinalizationMessageMaximumVotesAggregator(config);
+
+			auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+			auto pMessage1 = CreateMessage(Height(102), hashes[0]);
+			auto pMessage2 = CreateMessage(Height(104), hashes[2]);
+
+			// Act:
+			pAggregator->add(*pMessage1, numVotes1);
+			pAggregator->add(*pMessage2, numVotes2);
+
+			// Assert:
+			std::ostringstream description;
+			description << "numVotes1 = " << numVotes1 << ", numVotes2 = " << numVotes2;
+
+			EXPECT_TRUE(pAggregator->hasConsensus()) << description.str();
+			EXPECT_EQ(Height(102 + expectedHashIndex), pAggregator->consensusHeight()) << description.str();
+			EXPECT_EQ(hashes[expectedHashIndex], pAggregator->consensusHash()) << description.str();
+		}
+	}
+
+	MAXIMUM_VOTES_TEST(ConsensusIsNotUpdatedWhenMessageWithLessVotesIsAdded) {
+		AssertMaximumVotesConsensus(1000, 999, 0);
+		AssertMaximumVotesConsensus(1000, 1, 0);
+	}
+
+	MAXIMUM_VOTES_TEST(ConsensusIsNotUpdatedWhenMessageWithEqualVotesIsAdded) {
+		AssertMaximumVotesConsensus(1000, 1000, 0);
+	}
+
+	MAXIMUM_VOTES_TEST(ConsensusIsUpdatedWhenMessageWithMoreVotesIsAdded) {
+		AssertMaximumVotesConsensus(1000, 1001, 2);
+		AssertMaximumVotesConsensus(1000, 9999, 2);
+	}
+
+	// endregion
+
+	// region reduce (MaximumVotes)
+
+	MAXIMUM_VOTES_TEST(ReduceOnlyPreservesBestMessageWhenBestMessageIsPresent) {
+		// Arrange:
+		auto config = CreateConfiguration(2000, 3000);
+		auto pAggregator = CreateFinalizationMessageMaximumVotesAggregator(config);
+
+		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+		auto pMessage1 = utils::UniqueToShared(CreateMessage(Height(102), hashes[0]));
+		auto pMessage2 = utils::UniqueToShared(CreateMessage(Height(103), hashes[1]));
+		auto pMessage3 = utils::UniqueToShared(CreateMessage(Height(104), hashes[2]));
+
+		FinalizationProof proof;
+		proof.push_back(pMessage1);
+		proof.push_back(pMessage2);
+		proof.push_back(pMessage3);
+
+		// Act:
+		pAggregator->add(*pMessage1, 100);
+		pAggregator->add(*pMessage2, 300);
+		pAggregator->add(*pMessage3, 200);
+		pAggregator->reduce(proof);
+
+		// Assert:
+		ASSERT_EQ(1u, proof.size());
+		test::AssertEqualMessage(*pMessage2, *proof[0], "best message");
+	}
+
+	MAXIMUM_VOTES_TEST(ReducePreservesNoMessagesWhenBestMessageIsNotPresent) {
+		// Arrange:
+		auto config = CreateConfiguration(2000, 3000);
+		auto pAggregator = CreateFinalizationMessageMaximumVotesAggregator(config);
+
+		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+		auto pMessage1 = utils::UniqueToShared(CreateMessage(Height(102), hashes[0]));
+		auto pMessage2 = utils::UniqueToShared(CreateMessage(Height(103), hashes[1]));
+		auto pMessage3 = utils::UniqueToShared(CreateMessage(Height(104), hashes[2]));
+
+		FinalizationProof proof;
+		proof.push_back(pMessage1);
+		proof.push_back(pMessage3);
+
+		// Act:
+		pAggregator->add(*pMessage1, 100);
+		pAggregator->add(*pMessage2, 300);
+		pAggregator->add(*pMessage3, 200);
+		pAggregator->reduce(proof);
+
+		// Assert:
+		EXPECT_TRUE(proof.empty());
+	}
+
+	// endregion
+
+	// region traits (CountVotes + CommonBlock)
 
 	namespace {
 		struct CountVotesTraits {
@@ -76,7 +206,7 @@ namespace catapult { namespace chain {
 
 	// endregion
 
-	// region constructor (all)
+	// region constructor (CountVotes + CommonBlock)
 
 	AGGREGATOR_TEST(InitiallyNoConsensusIsPresent) {
 		// Arrange:
@@ -91,7 +221,7 @@ namespace catapult { namespace chain {
 
 	// endregion
 
-	// region single message (all)
+	// region single message (CountVotes + CommonBlock)
 
 	namespace {
 		template<typename TTraits>
@@ -148,7 +278,7 @@ namespace catapult { namespace chain {
 
 	// endregion
 
-	// region multiple messages (all)
+	// region multiple messages (CountVotes + CommonBlock)
 
 	AGGREGATOR_TEST(MessageVotesAreAdditiveWhenBothHeightAndHashMatch) {
 		// Arrange:
@@ -243,6 +373,32 @@ namespace catapult { namespace chain {
 
 		// Assert: second message is ignored (voter is malicious)
 		AssertNoConsensus(*pAggregator);
+	}
+
+	// endregion
+
+	// region reduce (CountVotes + CommonBlock)
+
+	AGGREGATOR_TEST(ReduceDoesNotChangeProof) {
+		// Arrange:
+		auto config = CreateConfiguration(2000, 3000);
+		auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+		auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
+
+		auto pMessage1 = utils::UniqueToShared(CreateMessage(Height(102), test::GenerateRandomByteArray<Hash256>()));
+		auto pMessage2 = utils::UniqueToShared(CreateMessage(Height(102), hashes[1]));
+
+		FinalizationProof proof;
+		proof.push_back(pMessage1);
+		proof.push_back(pMessage2);
+
+		// Act:
+		pAggregator->reduce(proof);
+
+		// Assert:
+		ASSERT_EQ(2u, proof.size());
+		test::AssertEqualMessage(*pMessage1, *proof[0], "message 1");
+		test::AssertEqualMessage(*pMessage2, *proof[1], "message 2");
 	}
 
 	// endregion

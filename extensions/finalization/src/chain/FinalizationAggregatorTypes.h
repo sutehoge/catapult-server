@@ -31,9 +31,6 @@ namespace catapult {
 
 namespace catapult { namespace chain {
 
-	/// Finalization proof.
-	using FinalizationProof = std::vector<std::shared_ptr<const model::FinalizationMessage>>;
-
 	/// Processes a finalization message.
 	using MessageProcessor = std::function<std::pair<model::ProcessMessageResult, size_t> (const model::FinalizationMessage&)>;
 

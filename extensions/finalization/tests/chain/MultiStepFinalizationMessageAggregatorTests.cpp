@@ -65,6 +65,8 @@ namespace catapult { namespace chain {
 
 		// region MockSingleStepFinalizationMessageAggregator
 
+		enum class ReductionMode { None, Choose_Last };
+
 		Key GetSignerPublicKey(const model::FinalizationMessage& message) {
 			return message.Signature.Root.ParentPublicKey;
 		}
@@ -72,9 +74,11 @@ namespace catapult { namespace chain {
 		class MockSingleStepFinalizationMessageAggregator : public SingleStepFinalizationMessageAggregator {
 		public:
 			MockSingleStepFinalizationMessageAggregator(
+					ReductionMode reductionMode,
 					const finalization::FinalizationConfiguration& config,
 					const crypto::StepIdentifier& stepIdentifier)
-					: m_config(config)
+					: m_reductionMode(reductionMode)
+					, m_config(config)
 					, m_stepIdentifier(stepIdentifier)
 					, m_hasConsensus(false)
 					, m_numVotes(0)
@@ -103,6 +107,14 @@ namespace catapult { namespace chain {
 			}
 
 		public:
+			void reduce(FinalizationProof& proof) override {
+				if (ReductionMode::None == m_reductionMode)
+					return;
+
+				auto pLastMessage = proof.back();
+				proof = { pLastMessage };
+			}
+
 			void add(const model::FinalizationMessage& message, uint64_t numVotes) override {
 				m_breadcrumbs.emplace_back(GetSignerPublicKey(message), numVotes);
 
@@ -115,6 +127,7 @@ namespace catapult { namespace chain {
 			}
 
 		private:
+			ReductionMode m_reductionMode;
 			finalization::FinalizationConfiguration m_config;
 			crypto::StepIdentifier m_stepIdentifier;
 			bool m_hasConsensus;
@@ -201,21 +214,26 @@ namespace catapult { namespace chain {
 
 		// region TestContext
 
+		struct TestContextOptions {
+			uint64_t MaxResponseSize = 10'000'000;
+			chain::ReductionMode ReductionMode = chain::ReductionMode::None;
+		};
+
 		class TestContext {
 		public:
 			TestContext(uint32_t threshold, uint32_t size, const MessageProcessor& messageProcessor)
-					: TestContext(threshold, size, 10'000'000, messageProcessor)
+					: TestContext(threshold, size, TestContextOptions(), messageProcessor)
 			{}
 
-			TestContext(uint32_t threshold, uint32_t size, uint64_t maxResponseSize, const MessageProcessor& messageProcessor) {
+			TestContext(uint32_t threshold, uint32_t size, const TestContextOptions& options, const MessageProcessor& messageProcessor) {
 				auto config = finalization::FinalizationConfiguration::Uninitialized();
 				config.Size = size;
 				config.Threshold = threshold;
 
 				m_pMultiStepAggregator = std::make_unique<MultiStepFinalizationMessageAggregator>(
-						maxResponseSize,
+						options.MaxResponseSize,
 						messageProcessor,
-						createAggregatorFactory(config),
+						createAggregatorFactory(options.ReductionMode, config),
 						createConsensusSink());
 			}
 
@@ -234,9 +252,14 @@ namespace catapult { namespace chain {
 			}
 
 		private:
-			SingleStepAggregatorFactory createAggregatorFactory(const finalization::FinalizationConfiguration& config) {
-				return [config, &singleStepAggregators = m_singleStepAggregators](const auto& stepIdentifier) {
-					auto pAggregator = std::make_unique<MockSingleStepFinalizationMessageAggregator>(config, stepIdentifier);
+			SingleStepAggregatorFactory createAggregatorFactory(
+					ReductionMode reductionMode,
+					const finalization::FinalizationConfiguration& config) {
+				return [reductionMode, config, &singleStepAggregators = m_singleStepAggregators](const auto& stepIdentifier) {
+					auto pAggregator = std::make_unique<MockSingleStepFinalizationMessageAggregator>(
+							reductionMode,
+							config,
+							stepIdentifier);
 					singleStepAggregators.push_back(pAggregator.get());
 					return pAggregator;
 				};
@@ -280,7 +303,9 @@ namespace catapult { namespace chain {
 				const crypto::StepIdentifier& expectedMinStepIdentifier,
 				const std::vector<SingleStepAggregatorDescriptor>& descriptors) {
 			// Arrange:
-			TestContext context(2000, 3000, messagesBuilder.createProcessor());
+			TestContextOptions options;
+			options.ReductionMode = TTraits::Reduction_Mode;
+			TestContext context(2000, 3000, options, messagesBuilder.createProcessor());
 			auto& aggregator = context.multiStepAggregator();
 
 			// Act:
@@ -330,11 +355,22 @@ namespace catapult { namespace chain {
 					aggregator.modifier().add(messagesBuilder.message(i));
 			}
 		};
+
+		template<typename TTraits, ReductionMode Reduction_Mode_Value>
+		struct ReductionModeTraitsDecorator : public TTraits {
+			static constexpr auto Reduction_Mode = Reduction_Mode_Value;
+		};
+
+		template<typename TTraits>
+		using ReductionNoneTraits = ReductionModeTraitsDecorator<TTraits, ReductionMode::None>;
+
+		template<typename TTraits>
+		using ReductionChooseLastTraits = ReductionModeTraitsDecorator<TTraits, ReductionMode::Choose_Last>;
 	}
 
 #define PROCESS_REPROCESS_TEST(TEST_NAME) \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
-	TEST(TEST_CLASS, TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ProcessTraits>(); } \
+	TEST(TEST_CLASS, TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ReductionNoneTraits<ProcessTraits>>(); } \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 
 	// endregion
@@ -434,6 +470,50 @@ namespace catapult { namespace chain {
 		// Assert:
 		ConsensusTuples expectedConsensusTuples{
 			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 0, 2 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
+	}
+
+	// endregion
+
+	// region single step - with reduction
+
+	PROCESS_REPROCESS_TEST(CanAddSingleStepMessagesThatReachConsensus_WithReduction) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		for (auto numVotes : std::initializer_list<uint64_t>{ 1000, 750, 250 })
+			messagesBuilder.push(Single_Step_Identifier, numVotes);
+
+		// Act:
+		auto consensusTuples = RunSingleStepMessagesTest<ReductionChooseLastTraits<TTraits>>(
+				messagesBuilder,
+				Single_Step_Identifier,
+				{ 0, 1, 2 });
+
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 2 }) }
+		};
+		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
+	}
+
+	PROCESS_REPROCESS_TEST(CanAddSingleStepMessagesThatReachConsensusMultipleTimes_WithReduction) {
+		// Arrange:
+		MessagesBuilder messagesBuilder;
+		for (auto numVotes : std::initializer_list<uint64_t>{ 2000, 1, 2 })
+			messagesBuilder.push(Single_Step_Identifier, numVotes);
+
+		// Act:
+		auto consensusTuples = RunSingleStepMessagesTest<ReductionChooseLastTraits<TTraits>>(
+				messagesBuilder,
+				Single_Step_Identifier,
+				{ 0, 1, 2 });
+
+		// Assert:
+		ConsensusTuples expectedConsensusTuples{
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(0), messagesBuilder.signerPublicKeys({ 0 }) },
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(1), messagesBuilder.signerPublicKeys({ 1 }) },
+			{ Single_Step_Identifier, Default_Height, messagesBuilder.hash(2), messagesBuilder.signerPublicKeys({ 2 }) }
 		};
 		EXPECT_EQ(expectedConsensusTuples, consensusTuples);
 	}
@@ -868,7 +948,9 @@ namespace catapult { namespace chain {
 
 			auto shortHashes = ToShortHashes(messagesBuilder);
 
-			TestContext context(2000, 3000, maxResponseSize, messagesBuilder.createProcessor());
+			TestContextOptions options;
+			options.MaxResponseSize = maxResponseSize;
+			TestContext context(2000, 3000, options, messagesBuilder.createProcessor());
 			auto& aggregator = context.multiStepAggregator();
 
 			ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);
@@ -894,7 +976,9 @@ namespace catapult { namespace chain {
 			auto shortHashes = ToShortHashes(messagesBuilder);
 			auto shortHashesSet = utils::ShortHashesSet(shortHashes.cbegin(), shortHashes.cend());
 
-			TestContext context(2000, 3000, maxResponseSize, messagesBuilder.createProcessor());
+			TestContextOptions options;
+			options.MaxResponseSize = maxResponseSize;
+			TestContext context(2000, 3000, options, messagesBuilder.createProcessor());
 			auto& aggregator = context.multiStepAggregator();
 
 			ProcessTraits::AddAll(aggregator, FP(6), messagesBuilder);

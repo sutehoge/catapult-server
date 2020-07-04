@@ -29,6 +29,9 @@ namespace catapult {
 
 namespace catapult { namespace chain {
 
+	/// Finalization proof.
+	using FinalizationProof = std::vector<std::shared_ptr<const model::FinalizationMessage>>;
+
 	/// Aggregates finalization messages for a single step until consensus is reached.
 	/// \note Messages are assumed to all refer to the same step identifier and be validated by the caller.
 	class SingleStepFinalizationMessageAggregator {
@@ -46,10 +49,19 @@ namespace catapult { namespace chain {
 		virtual Hash256 consensusHash() const = 0;
 
 	public:
+		/// Reduces \a proof by removing superfluous messages.
+		/// \note This allows an aggregator to pick a best message.
+		virtual void reduce(FinalizationProof& proof) = 0;
+
 		/// Adds a finalization \a message to the aggregator that contributes \a numVotes votes.
 		/// \note This function is expected to be called after ProcessMessage.
 		virtual void add(const model::FinalizationMessage& message, uint64_t numVotes) = 0;
 	};
+
+	/// Creates a finalization message aggregator that picks the message with the maximum number of votes given \a config.
+	/// \note This "aggregator" always reaches initial consensus after the first message is received.
+	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageMaximumVotesAggregator(
+			const finalization::FinalizationConfiguration& config);
 
 	/// Creates a finalization message aggregator that attempts to reach consensus on a single value given \a config.
 	std::unique_ptr<SingleStepFinalizationMessageAggregator> CreateFinalizationMessageCountVotesAggregator(

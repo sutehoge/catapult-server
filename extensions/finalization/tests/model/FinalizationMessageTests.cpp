@@ -41,12 +41,7 @@ namespace catapult { namespace model {
 		// region test utils - message
 
 		std::unique_ptr<FinalizationMessage> CreateMessage(uint32_t numHashes) {
-			uint32_t messageSize = sizeof(FinalizationMessage) + numHashes * Hash256::Size;
-			auto pMessage = utils::MakeUniqueWithSize<FinalizationMessage>(messageSize);
-			test::FillWithRandomData({ reinterpret_cast<uint8_t*>(pMessage.get()), messageSize });
-			pMessage->Size = messageSize;
-			pMessage->HashesCount = numHashes;
-			return pMessage;
+			return test::CreateMessage(test::GenerateRandomValue<Height>(), numHashes);
 		}
 
 		// endregion

@@ -42,6 +42,9 @@ namespace catapult { namespace finalization {
 		/// Maximum size of a finalization message synchronization response.
 		utils::FileSize MessageSynchronizationMaxResponseSize;
 
+		/// Maximum number of hashes to finalize per finalization point.
+		uint32_t MaxHashesPerPoint;
+
 	private:
 		FinalizationConfiguration() = default;
 

@@ -35,8 +35,11 @@ namespace catapult { namespace test {
 	/// Creates a finalization message around one \a hash.
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(const Hash256& hash);
 
-	/// Creates a finalization message around one \a hash at \a height
+	/// Creates a finalization message around one \a hash at \a height.
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, const Hash256& hash);
+
+	/// Creates a finalization message around \a numHashes hashes at \a height.
+	std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, uint32_t numHashes);
 
 	/// Creates a finalization message with \a stepIdentifier and one \a hash.
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(const crypto::StepIdentifier& stepIdentifier, const Hash256& hash);

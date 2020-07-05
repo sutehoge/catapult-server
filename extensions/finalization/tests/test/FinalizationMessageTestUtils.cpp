@@ -43,6 +43,16 @@ namespace catapult { namespace test {
 		return pMessage;
 	}
 
+	std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, uint32_t numHashes) {
+		uint32_t messageSize = sizeof(model::FinalizationMessage) + numHashes * Hash256::Size;
+		auto pMessage = utils::MakeUniqueWithSize<model::FinalizationMessage>(messageSize);
+		test::FillWithRandomData({ reinterpret_cast<uint8_t*>(pMessage.get()), messageSize });
+		pMessage->Size = messageSize;
+		pMessage->HashesCount = numHashes;
+		pMessage->Height = height;
+		return pMessage;
+	}
+
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(const crypto::StepIdentifier& stepIdentifier, const Hash256& hash) {
 		uint32_t messageSize = sizeof(model::FinalizationMessage) + Hash256::Size;
 		auto pMessage = utils::MakeUniqueWithSize<model::FinalizationMessage>(messageSize);

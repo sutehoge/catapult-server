@@ -29,10 +29,13 @@ namespace catapult { namespace chain {
 	// region BasicFinalizationMessageAggregator
 
 	namespace {
+		enum class HashConstraint { Single, Multiple };
+
 		class BasicFinalizationMessageAggregator : public SingleStepFinalizationMessageAggregator {
 		public:
-			explicit BasicFinalizationMessageAggregator(const finalization::FinalizationConfiguration& config)
+			BasicFinalizationMessageAggregator(const finalization::FinalizationConfiguration& config, HashConstraint hashConstraint)
 					: m_config(config)
+					, m_hashConstraint(hashConstraint)
 					, m_hasConsensus(false)
 			{}
 
@@ -55,6 +58,13 @@ namespace catapult { namespace chain {
 			}
 
 			void add(const model::FinalizationMessage& message, uint64_t numVotes) override final {
+				if (!checkHashesCount(message.HashesCount)) {
+					CATAPULT_LOG(debug)
+							<< "skipping message for " << message.StepIdentifier
+							<< " with unexpected number of hashes " << message.HashesCount;
+					return;
+				}
+
 				model::HeightHashPair heightHashPair{ message.Height, *message.HashesPtr() };
 				add(m_config, message.Signature.Root.ParentPublicKey, heightHashPair, numVotes);
 			}
@@ -66,6 +76,17 @@ namespace catapult { namespace chain {
 			}
 
 		private:
+			bool checkHashesCount(uint32_t count) const {
+				if (0 == count)
+					return false;
+
+				if (HashConstraint::Single == m_hashConstraint)
+					return 1 == count;
+
+				return count <= m_config.MaxHashesPerPoint;
+			}
+
+		private:
 			virtual void add(
 					const finalization::FinalizationConfiguration& config,
 					const Key& votingPublicKey,
@@ -74,6 +95,7 @@ namespace catapult { namespace chain {
 
 		private:
 			finalization::FinalizationConfiguration m_config;
+			HashConstraint m_hashConstraint;
 			bool m_hasConsensus;
 			model::HeightHashPair m_consensusHeightHashPair;
 		};
@@ -87,7 +109,7 @@ namespace catapult { namespace chain {
 		class FinalizationMessageMaximumVotesAggregator : public BasicFinalizationMessageAggregator {
 		public:
 			explicit FinalizationMessageMaximumVotesAggregator(const finalization::FinalizationConfiguration& config)
-					: BasicFinalizationMessageAggregator(config)
+					: BasicFinalizationMessageAggregator(config, HashConstraint::Multiple)
 					, m_maxVotes(0)
 			{}
 
@@ -142,7 +164,7 @@ namespace catapult { namespace chain {
 		class FinalizationMessageCountVotesAggregator : public BasicFinalizationMessageAggregator {
 		public:
 			explicit FinalizationMessageCountVotesAggregator(const finalization::FinalizationConfiguration& config)
-					: BasicFinalizationMessageAggregator(config)
+					: BasicFinalizationMessageAggregator(config, HashConstraint::Single)
 			{}
 
 		public:
@@ -186,7 +208,7 @@ namespace catapult { namespace chain {
 					const finalization::FinalizationConfiguration& config,
 					const std::vector<Hash256>& hashes,
 					Height height)
-					: BasicFinalizationMessageAggregator(config)
+					: BasicFinalizationMessageAggregator(config, HashConstraint::Single)
 					, m_hashes(hashes)
 					, m_height(height)
 					, m_hashVotes(m_hashes.size(), 0)

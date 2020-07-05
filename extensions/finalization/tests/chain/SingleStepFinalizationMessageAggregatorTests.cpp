@@ -35,11 +35,16 @@ namespace catapult { namespace chain {
 			auto config = finalization::FinalizationConfiguration::Uninitialized();
 			config.Size = size;
 			config.Threshold = threshold;
+			config.MaxHashesPerPoint = 200;
 			return config;
 		}
 
 		std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, const Hash256& hash) {
 			return test::CreateMessage(height, hash);
+		}
+
+		std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, uint32_t numHashes) {
+			return test::CreateMessage(height, numHashes);
 		}
 
 		void AssertNoConsensus(const SingleStepFinalizationMessageAggregator& aggregator, const std::string& message = "") {
@@ -123,6 +128,60 @@ namespace catapult { namespace chain {
 	MAXIMUM_VOTES_TEST(ConsensusIsUpdatedWhenMessageWithMoreVotesIsAdded) {
 		AssertMaximumVotesConsensus(1000, 1001, 2);
 		AssertMaximumVotesConsensus(1000, 9999, 2);
+	}
+
+	// endregion
+
+	// region hash constraints (MaximumVotes)
+
+	namespace {
+		void AssertMaximumVotesMesssageWithHashesIsRejected(uint32_t numHashes) {
+			// Arrange:
+			auto config = CreateConfiguration(2000, 3000);
+			auto pAggregator = CreateFinalizationMessageMaximumVotesAggregator(config);
+
+			auto pMessage = CreateMessage(Height(102), numHashes);
+
+			// Act:
+			pAggregator->add(*pMessage, 2500);
+
+			// Assert:
+			AssertNoConsensus(*pAggregator, std::to_string(numHashes));
+		}
+
+		void AssertMaximumVotesMesssageWithHashesIsAllowed(uint32_t numHashes) {
+			// Arrange:
+			auto config = CreateConfiguration(2000, 3000);
+			auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+			auto pAggregator = CreateFinalizationMessageMaximumVotesAggregator(config);
+
+			auto pMessage = CreateMessage(Height(102), numHashes);
+			if (numHashes > 0)
+				*pMessage->HashesPtr() = hashes[1];
+
+			// Act:
+			pAggregator->add(*pMessage, 2500);
+
+			// Assert:
+			EXPECT_TRUE(pAggregator->hasConsensus()) << numHashes;
+			EXPECT_EQ(Height(102), pAggregator->consensusHeight()) << numHashes;
+			EXPECT_EQ(hashes[1], pAggregator->consensusHash()) << numHashes;
+		}
+	}
+
+	MAXIMUM_VOTES_TEST(MesssageWithZeroHashesIsRejected) {
+		AssertMaximumVotesMesssageWithHashesIsRejected(0);
+	}
+
+	MAXIMUM_VOTES_TEST(MesssageWithMultipleHashesLessThanOrEqualToMaximumIsAllowed) {
+		AssertMaximumVotesMesssageWithHashesIsAllowed(2);
+		AssertMaximumVotesMesssageWithHashesIsAllowed(101);
+		AssertMaximumVotesMesssageWithHashesIsAllowed(200);
+	}
+
+	MAXIMUM_VOTES_TEST(MesssageWithMultipleHashesGreaterThanMaximumIsRejected) {
+		AssertMaximumVotesMesssageWithHashesIsRejected(201);
+		AssertMaximumVotesMesssageWithHashesIsRejected(300);
 	}
 
 	// endregion
@@ -373,6 +432,39 @@ namespace catapult { namespace chain {
 
 		// Assert: second message is ignored (voter is malicious)
 		AssertNoConsensus(*pAggregator);
+	}
+
+	// endregion
+
+	// region hash constraints (CountVotes + CommonBlock)
+
+	namespace {
+		template<typename TTraits>
+		void AssertMesssageWithHashesIsRejected(uint32_t numHashes) {
+			// Arrange:
+			auto config = CreateConfiguration(2000, 3000);
+			auto hashes = test::GenerateRandomDataVector<Hash256>(3);
+			auto pAggregator = TTraits::CreateFinalizationMessageAggregator(config, hashes, Height(101));
+
+			auto pMessage = CreateMessage(Height(102), numHashes);
+			if (numHashes > 0)
+				*pMessage->HashesPtr() = hashes[1];
+
+			// Act:
+			pAggregator->add(*pMessage, 2500);
+
+			// Assert:
+			AssertNoConsensus(*pAggregator, std::to_string(numHashes));
+		}
+	}
+
+	AGGREGATOR_TEST(MesssageWithZeroHashesIsRejected) {
+		AssertMesssageWithHashesIsRejected<TTraits>(0);
+	}
+
+	AGGREGATOR_TEST(MesssageWithMultipleHashesIsRejected) {
+		AssertMesssageWithHashesIsRejected<TTraits>(2);
+		AssertMesssageWithHashesIsRejected<TTraits>(10);
 	}
 
 	// endregion

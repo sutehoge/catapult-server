@@ -40,7 +40,9 @@ namespace catapult { namespace finalization {
 		LOAD_PROPERTY(ShortLivedCacheMessageDuration);
 		LOAD_PROPERTY(MessageSynchronizationMaxResponseSize);
 
-		utils::VerifyBagSizeLte(bag, 4);
+		LOAD_PROPERTY(MaxHashesPerPoint);
+
+		utils::VerifyBagSizeLte(bag, 5);
 		return config;
 	}
 

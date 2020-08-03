@@ -263,21 +263,6 @@ function(catapult_target TARGET_NAME)
 	# indicate boost as a dependency
 	target_link_libraries(${TARGET_NAME} ${Boost_LIBRARIES})
 
-	# copy boost shared libraries
-	foreach(BOOST_COMPONENT ${CATAPULT_BOOST_COMPONENTS})
-		if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-			string(TOUPPER ${BOOST_COMPONENT} BOOST_COMPONENT_UC)
-
-			# copy into ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/boost
-			set(BOOSTDLLNAME ${Boost_${BOOST_COMPONENT_UC}_LIBRARY_RELEASE})
-			set(BOOSTVERSION "${Boost_VERSION_MAJOR}.${Boost_VERSION_MINOR}.${Boost_VERSION_PATCH}")
-			get_filename_component(BOOSTFILENAME ${BOOSTDLLNAME} NAME)
-			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-				"${BOOSTDLLNAME}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/boost")
-		endif()
-	endforeach()
-
 	# put both plugins and plugins tests in same 'folder'
 	if(TARGET_NAME MATCHES "\.plugins")
 		set_property(TARGET ${TARGET_NAME} PROPERTY FOLDER "plugins")

@@ -69,4 +69,4 @@ bin, *.dll -> ./bin
 lib, *.dylib* -> ./deps
 
 # on linux,  copy shared libraries into deps directory
-lib, *.so* -> ./bin
+lib, *.so* -> ./deps

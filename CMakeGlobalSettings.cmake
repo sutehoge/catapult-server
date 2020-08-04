@@ -149,24 +149,6 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g1")
 endif()
 
-# set runpath for built binaries on linux
-if(("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" AND "${CMAKE_SYSTEM_NAME}" MATCHES "Linux"))
-	file(MAKE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/boost")
-	set(CMAKE_SKIP_BUILD_RPATH FALSE)
-
-	# $origin - to load plugins when running the server
-	# $origin/boost - same, use our boost libs
-	set(CMAKE_INSTALL_RPATH "$ORIGIN:$ORIGIN/../deps:$ORIGIN/../lib${CMAKE_INSTALL_RPATH}")
-	set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-	set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-	# use rpath for executables
-	# (executable rpath will be used for loading indirect libs, this is needed because boost libs do not set runpath)
-	# use newer runpath for shared libs
-	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--enable-new-dtags")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--disable-new-dtags")
-endif()
-
 if(USE_CONAN)
 	# only set rpath when running conan, which copies dependencies to `@executable_path/../deps`
 	# when not using conan, rpath is set to link paths by default

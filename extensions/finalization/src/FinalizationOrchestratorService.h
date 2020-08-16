@@ -19,24 +19,13 @@
 **/
 
 #pragma once
-#include "sdk/src/extensions/MemoryBlockStorage.h"
-#include "catapult/io/BlockStorageCache.h"
+#include "catapult/extensions/ServiceRegistrar.h"
 
-namespace catapult { namespace mocks {
+namespace catapult { namespace finalization { struct FinalizationConfiguration; } }
 
-	/// Mock memory-based block storage that loads and saves blocks in memory.
-	class MockMemoryBlockStorage : public extensions::MemoryBlockStorage {
-	public:
-		/// Creates a mock memory-based block storage.
-		MockMemoryBlockStorage();
-	};
+namespace catapult { namespace finalization {
 
-	/// Creates a memory based block storage composed of \a numBlocks.
-	std::unique_ptr<io::PrunableBlockStorage> CreateMemoryBlockStorage(uint32_t numBlocks);
-
-	/// Creates a memory based block storage cache composed of \a numBlocks.
-	std::unique_ptr<io::BlockStorageCache> CreateMemoryBlockStorageCache(uint32_t numBlocks);
-
-	/// Seeds \a storage with \a numBlocks.
-	void SeedStorageWithFixedSizeBlocks(io::BlockStorageCache& storage, uint32_t numBlocks);
+	/// Creates a registrar for a finalization orchestrator service around \a config.
+	/// \note This service is responsible for registering the main finalization scheduled task.
+	DECLARE_SERVICE_REGISTRAR(FinalizationOrchestrator)(const FinalizationConfiguration& config);
 }}

@@ -21,6 +21,8 @@
 #include "FinalizationStageAdvancer.h"
 #include "MultiRoundMessageAggregator.h"
 #include "RoundContext.h"
+#include "finalization/src/FinalizationConfiguration.h"
+#include "catapult/model/HeightGrouping.h"
 
 namespace catapult { namespace chain {
 
@@ -42,15 +44,22 @@ namespace catapult { namespace chain {
 			utils::TimeSpan m_stepDuration;
 		};
 
+		bool IsVotingSetEndHeight(Height height, uint64_t votingSetGrouping) {
+			auto votingSetHeight = model::CalculateGroupedHeight<Height>(height, votingSetGrouping);
+			auto nextVotingSetHeight = model::CalculateGroupedHeight<Height>(height + Height(1), votingSetGrouping);
+			return votingSetHeight != nextVotingSetHeight;
+		}
+
 		class DefaultFinalizationStageAdvancer : public FinalizationStageAdvancer {
 		public:
 			DefaultFinalizationStageAdvancer(
+					const finalization::FinalizationConfiguration& config,
 					FinalizationPoint point,
 					Timestamp time,
-					const utils::TimeSpan& stepDuration,
 					const MultiRoundMessageAggregator& messageAggregator)
-					: m_point(point)
-					, m_timer(time, stepDuration)
+					: m_config(config)
+					, m_point(point)
+					, m_timer(time, m_config.StepDuration)
 					, m_messageAggregator(messageAggregator)
 			{}
 
@@ -83,8 +92,20 @@ namespace catapult { namespace chain {
 			}
 
 			bool canStartNextRound() const override {
-				return requireRoundContext([](const auto&, const auto& roundContext) {
-					return roundContext.isCompletable();
+				return requireRoundContext([this](const auto& messageAggregatorView, const auto& roundContext) {
+					if (!roundContext.isCompletable())
+						return false;
+
+					// if the best estimate cannot end a voting set, the next round can start immediately
+					// even if the best estimate is finalized, it will not end the voting set
+					auto votingSetGrouping = m_config.VotingSetGrouping;
+					auto estimate = messageAggregatorView.findEstimate(m_point);
+					if (!IsVotingSetEndHeight(estimate.Height, votingSetGrouping))
+						return true;
+
+					// if the best precommit ends a voting set, the next round can start
+					auto bestPrecommitResultPair = roundContext.tryFindBestPrecommit();
+					return bestPrecommitResultPair.second && IsVotingSetEndHeight(bestPrecommitResultPair.first.Height, votingSetGrouping);
 				});
 			}
 
@@ -100,6 +121,7 @@ namespace catapult { namespace chain {
 			}
 
 		private:
+			finalization::FinalizationConfiguration m_config;
 			FinalizationPoint m_point;
 			PollingTimer m_timer;
 			const MultiRoundMessageAggregator& m_messageAggregator;
@@ -107,10 +129,10 @@ namespace catapult { namespace chain {
 	}
 
 	std::unique_ptr<FinalizationStageAdvancer> CreateFinalizationStageAdvancer(
+			const finalization::FinalizationConfiguration& config,
 			FinalizationPoint point,
 			Timestamp time,
-			const utils::TimeSpan& stepDuration,
 			const MultiRoundMessageAggregator& messageAggregator) {
-		return std::make_unique<DefaultFinalizationStageAdvancer>(point, time, stepDuration, messageAggregator);
+		return std::make_unique<DefaultFinalizationStageAdvancer>(config, point, time, messageAggregator);
 	}
 }}

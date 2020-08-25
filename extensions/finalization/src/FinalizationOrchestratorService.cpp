@@ -52,8 +52,8 @@ namespace catapult { namespace finalization {
 					, m_otsStream(io::RawFile(GetOtsTreeFilename(state), io::OpenMode::Read_Append))
 					, m_orchestrator(
 							m_proofStorage.view().statistics().Point + FinalizationPoint(1),
-							[stepDuration = config.StepDuration, &messageAggregator = m_messageAggregator](auto point, auto time) {
-								return chain::CreateFinalizationStageAdvancer(point, time, stepDuration, messageAggregator);
+							[config, &messageAggregator = m_messageAggregator](auto point, auto time) {
+								return chain::CreateFinalizationStageAdvancer(config, point, time, messageAggregator);
 							},
 							[&hooks = m_hooks](auto&& pMessage) {
 								hooks.messageRangeConsumer()(model::FinalizationMessageRange::FromEntity(std::move(pMessage)));

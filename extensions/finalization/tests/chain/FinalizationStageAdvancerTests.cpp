@@ -36,11 +36,16 @@ namespace catapult { namespace chain {
 			using RoundMessageAggregatorInitializer = consumer<mocks::MockRoundMessageAggregator&>;
 
 		public:
-			TestContext(FinalizationPoint point, Timestamp time, const utils::TimeSpan& stepDuration)
-					: TestContext(point, point, time, stepDuration)
+			TestContext(FinalizationPoint point, Timestamp time, const utils::TimeSpan& stepDuration, uint64_t votingSetGrouping = 100)
+					: TestContext(point, point, time, stepDuration, votingSetGrouping)
 			{}
 
-			TestContext(FinalizationPoint minPoint, FinalizationPoint maxPoint, Timestamp time, const utils::TimeSpan& stepDuration) {
+			TestContext(
+					FinalizationPoint minPoint,
+					FinalizationPoint maxPoint,
+					Timestamp time,
+					const utils::TimeSpan& stepDuration,
+					uint64_t votingSetGrouping = 100) {
 				m_pAggregator = std::make_unique<MultiRoundMessageAggregator>(
 						10'000'000,
 						minPoint,
@@ -57,7 +62,11 @@ namespace catapult { namespace chain {
 				// aggregator's current max point
 				m_pAggregator->modifier().setMaxFinalizationPoint(maxPoint + FinalizationPoint(10));
 
-				m_pAdvancer = CreateFinalizationStageAdvancer(maxPoint, time, stepDuration, *m_pAggregator);
+				auto config = finalization::FinalizationConfiguration::Uninitialized();
+				config.StepDuration = stepDuration;
+				config.VotingSetGrouping = votingSetGrouping;
+
+				m_pAdvancer = CreateFinalizationStageAdvancer(config, maxPoint, time, *m_pAggregator);
 			}
 
 		public:
@@ -104,7 +113,7 @@ namespace catapult { namespace chain {
 
 	// region canSendPrevote
 
-	TEST(TEST_CLASS, CanSendPrevoteReturnsTrueAtStepIntervalWhenRoundDoesNotExist) {
+	TEST(TEST_CLASS, CanSendPrevoteAtStepIntervalWhenRoundDoesNotExist) {
 		// Arrange:
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 
@@ -116,7 +125,7 @@ namespace catapult { namespace chain {
 			EXPECT_TRUE(context.advancer().canSendPrevote(Timestamp(value))) << value;
 	}
 
-	TEST(TEST_CLASS, CanSendPrevoteReturnsTrueAtStepIntervalWhenRoundIsNotCompletable) {
+	TEST(TEST_CLASS, CanSendPrevoteAtStepIntervalWhenRoundIsNotCompletable) {
 		// Arrange:
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
@@ -134,7 +143,7 @@ namespace catapult { namespace chain {
 			EXPECT_TRUE(context.advancer().canSendPrevote(Timestamp(value))) << value;
 	}
 
-	TEST(TEST_CLASS, CanSendPrevoteReturnsTrueWhenRoundIsCompletable) {
+	TEST(TEST_CLASS, CanSendPrevoteWhenRoundIsCompletable) {
 		// Arrange:
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
@@ -154,7 +163,7 @@ namespace catapult { namespace chain {
 
 	// region canSendPrecommit
 
-	TEST(TEST_CLASS, CanSendPrecommitReturnsFalseWhenRoundDoesNotExist) {
+	TEST(TEST_CLASS, CannotSendPrecommitWhenRoundDoesNotExist) {
 		// Arrange:
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 
@@ -166,7 +175,7 @@ namespace catapult { namespace chain {
 		}
 	}
 
-	TEST(TEST_CLASS, CanSendPrecommitReturnsFalseWhenBestPrevoteDoesNotExist) {
+	TEST(TEST_CLASS, CannotSendPrecommitWhenBestPrevoteDoesNotExist) {
 		// Arrange:
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
@@ -184,7 +193,7 @@ namespace catapult { namespace chain {
 		}
 	}
 
-	TEST(TEST_CLASS, CanSendPrecommitReturnsFalseWhenBestPrevoteIsNotDescendantOfPreviousRoundEstimate) {
+	TEST(TEST_CLASS, CannotSendPrecommitWhenBestPrevoteIsNotDescendantOfPreviousRoundEstimate) {
 		// Arrange:
 		auto hash = test::GenerateRandomByteArray<Hash256>();
 		TestContext context(FinalizationPoint(6), FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
@@ -210,7 +219,7 @@ namespace catapult { namespace chain {
 		}
 	}
 
-	TEST(TEST_CLASS, CanSendPrecommitReturnsTrueAtDoubleStepIntervalWhenBestPrevoteIsDescendant) {
+	TEST(TEST_CLASS, CanSendPrecommitAtDoubleStepIntervalWhenBestPrevoteIsDescendant) {
 		// Arrange:
 		auto hash1 = test::GenerateRandomByteArray<Hash256>();
 		auto hash2 = test::GenerateRandomByteArray<Hash256>();
@@ -243,7 +252,7 @@ namespace catapult { namespace chain {
 		}
 	}
 
-	TEST(TEST_CLASS, CanSendPrecommitReturnsTrueWhenBestPrevoteIsDescendantAndRoundIsCompletable) {
+	TEST(TEST_CLASS, CanSendPrecommitWhenBestPrevoteIsDescendantAndRoundIsCompletable) {
 		// Arrange:
 		auto hash1 = test::GenerateRandomByteArray<Hash256>();
 		auto hash2 = test::GenerateRandomByteArray<Hash256>();
@@ -275,7 +284,7 @@ namespace catapult { namespace chain {
 
 	// region canStartNextRound
 
-	TEST(TEST_CLASS, CanStartNextRoundReturnsFalseWhenRoundDoesNotExist) {
+	TEST(TEST_CLASS, CannotStartNextRoundWhenRoundDoesNotExist) {
 		// Arrange:
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 
@@ -283,7 +292,7 @@ namespace catapult { namespace chain {
 		EXPECT_FALSE(context.advancer().canStartNextRound());
 	}
 
-	TEST(TEST_CLASS, CanStartNextRoundReturnsFalseWhenRoundIsNotCompletable) {
+	TEST(TEST_CLASS, CannotStartNextRoundWhenRoundIsNotCompletable) {
 		// Arrange:
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
@@ -297,8 +306,8 @@ namespace catapult { namespace chain {
 		EXPECT_FALSE(context.advancer().canStartNextRound());
 	}
 
-	TEST(TEST_CLASS, CanStartNextRoundReturnsTrueWhenRoundIsCompletable) {
-		// Arrange:
+	TEST(TEST_CLASS, CanStartNextRoundWhenRoundIsCompletableAndEstimateDoesNotEndVotingSet) {
+		// Arrange: estimate is 246, VotingSetGrouping is 100
 		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100));
 		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
 			auto hash = test::GenerateRandomByteArray<Hash256>();
@@ -310,6 +319,52 @@ namespace catapult { namespace chain {
 
 		// Act + Assert:
 		EXPECT_TRUE(context.advancer().canStartNextRound());
+	}
+
+	TEST(TEST_CLASS, CannotStartNextRoundWhenRoundIsCompletableAndEstimateEndsVotingSetButThereIsNoBestPrecommit) {
+		// Arrange: estimate is 246, VotingSetGrouping is 246
+		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100), 246);
+		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
+			auto hash = test::GenerateRandomByteArray<Hash256>();
+			roundMessageAggregator.roundContext().acceptPrevote(Height(246), &hash, 1, 750);
+			roundMessageAggregator.roundContext().acceptPrecommit(Height(246), hash, 500);
+		});
+
+		context.aggregator().modifier().add(test::CreateMessage(FinalizationPoint(7)));
+
+		// Act + Assert:
+		EXPECT_FALSE(context.advancer().canStartNextRound());
+	}
+
+	TEST(TEST_CLASS, CanStartNextRoundWhenRoundIsCompletableAndBothEstimateAndBestPrecommitEndVotingSet) {
+		// Arrange: estimate is 246, VotingSetGrouping is 246
+		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100), 246);
+		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
+			auto hash = test::GenerateRandomByteArray<Hash256>();
+			roundMessageAggregator.roundContext().acceptPrevote(Height(246), &hash, 1, 750);
+			roundMessageAggregator.roundContext().acceptPrecommit(Height(246), hash, 750);
+		});
+
+		context.aggregator().modifier().add(test::CreateMessage(FinalizationPoint(7)));
+
+		// Act + Assert:
+		EXPECT_TRUE(context.advancer().canStartNextRound());
+	}
+
+	TEST(TEST_CLASS, CannotStartNextRoundWhenRoundIsCompletableAndEstimateButNotBestPrecommitEndVotingSet) {
+		// Arrange: estimate is 246, VotingSetGrouping is 246
+		TestContext context(FinalizationPoint(7), Timestamp(50), utils::TimeSpan::FromMilliseconds(100), 246);
+		context.setRoundMessageAggregatorInitializer([](auto& roundMessageAggregator) {
+			auto hashes = test::GenerateRandomDataVector<Hash256>(2);
+			roundMessageAggregator.roundContext().acceptPrevote(Height(245), hashes.data(), 2, 750);
+			roundMessageAggregator.roundContext().acceptPrecommit(Height(245), hashes[0], 200);
+			roundMessageAggregator.roundContext().acceptPrecommit(Height(246), hashes[1], 500);
+		});
+
+		context.aggregator().modifier().add(test::CreateMessage(FinalizationPoint(7)));
+
+		// Act + Assert:
+		EXPECT_FALSE(context.advancer().canStartNextRound());
 	}
 
 	// endregion

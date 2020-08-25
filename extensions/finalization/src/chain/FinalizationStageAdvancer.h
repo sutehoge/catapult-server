@@ -22,7 +22,10 @@
 #include "catapult/model/HeightHashPair.h"
 #include "catapult/utils/TimeSpan.h"
 
-namespace catapult { namespace chain { class MultiRoundMessageAggregator; } }
+namespace catapult {
+	namespace chain { class MultiRoundMessageAggregator; }
+	namespace finalization { struct FinalizationConfiguration; }
+}
 
 namespace catapult { namespace chain {
 
@@ -43,10 +46,10 @@ namespace catapult { namespace chain {
 		virtual bool canStartNextRound() const = 0;
 	};
 
-	/// Creates an advancer for the specified \a point given the current \a time, \a stepDuration and \a messageAggregator.
+	/// Creates an advancer for the specified \a point given the current \a time, \a config and \a messageAggregator.
 	std::unique_ptr<FinalizationStageAdvancer> CreateFinalizationStageAdvancer(
+			const finalization::FinalizationConfiguration& config,
 			FinalizationPoint point,
 			Timestamp time,
-			const utils::TimeSpan& stepDuration,
 			const MultiRoundMessageAggregator& messageAggregator);
 }}

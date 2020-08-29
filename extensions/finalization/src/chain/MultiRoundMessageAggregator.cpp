@@ -120,21 +120,28 @@ namespace catapult { namespace chain {
 	RoundMessageAggregator::UnknownMessages MultiRoundMessageAggregatorView::unknownMessages(
 			const model::FinalizationRound& round,
 			const utils::ShortHashesSet& knownShortHashes) const {
+		CATAPULT_LOG(debug) << "<FIN:debug> finding unknownMessages for round " << round;
+
 		uint64_t totalSize = 0;
 		RoundMessageAggregator::UnknownMessages allMessages;
 		for (const auto& pair : m_state.RoundMessageAggregators) {
-			if (pair.first < round)
+			if (pair.first < round) {
+				CATAPULT_LOG(debug) << "<FIN:debug> skipping aggregator with " << round;
 				continue;
+			}
 
 			for (const auto& pMessage : pair.second->unknownMessages(knownShortHashes)) {
 				totalSize += pMessage->Size;
-				if (totalSize > m_state.MaxResponseSize)
+				if (totalSize > m_state.MaxResponseSize) {
+					CATAPULT_LOG(debug) << "<FIN:debug> returning " << allMessages.size() << "messages (limit)";
 					return allMessages;
+				}
 
 				allMessages.push_back(pMessage);
 			}
 		}
 
+		CATAPULT_LOG(debug) << "<FIN:debug> returning " << allMessages.size() << "messages (all)";
 		return allMessages;
 	}
 
@@ -153,6 +160,7 @@ namespace catapult { namespace chain {
 		if (m_state.MinFinalizationRound > round)
 			CATAPULT_THROW_INVALID_ARGUMENT("cannot set max finalization round below min");
 
+		CATAPULT_LOG(debug) << "<FIN> setting max finalization round to " << round;
 		m_state.MaxFinalizationRound = round;
 	}
 
@@ -172,6 +180,7 @@ namespace catapult { namespace chain {
 			iter = m_state.RoundMessageAggregators.emplace(messageRound, std::move(pRoundAggregator)).first;
 		}
 
+		CATAPULT_LOG(debug) << "<FIN> adding message to aggregator at " << messageRound << " with height " << pMessage->Height;
 		return iter->second->add(pMessage);
 	}
 
@@ -198,6 +207,7 @@ namespace catapult { namespace chain {
 			}
 		}
 
+		CATAPULT_LOG(debug) << "<FIN> pruning  MultiRoundMessageAggregator: " << roundMessageAggregators.cbegin()->first;
 		roundMessageAggregators.erase(roundMessageAggregators.cbegin(), lastMatchingIter);
 		m_state.MinFinalizationRound = lastMatchingIter->first;
 	}

@@ -290,19 +290,29 @@ namespace catapult { namespace crypto {
 	}
 
 	bool OtsTree::canSign(const OtsKeyIdentifier& keyIdentifier) const {
-		if (Invalid_Batch_Id != m_lastKeyIdentifier.BatchId && keyIdentifier <= m_lastKeyIdentifier)
+		if (Invalid_Batch_Id != m_lastKeyIdentifier.BatchId && keyIdentifier <= m_lastKeyIdentifier) {
+			CATAPULT_LOG(debug) << "<FIN> keyIdentifier " << keyIdentifier << " lastKeyIdentifier " << m_lastKeyIdentifier;
 			return false;
+		}
 
-		if (keyIdentifier < m_options.StartKeyIdentifier || keyIdentifier > m_options.EndKeyIdentifier)
+		if (keyIdentifier < m_options.StartKeyIdentifier || keyIdentifier > m_options.EndKeyIdentifier) {
+			CATAPULT_LOG(debug)
+					<< "<FIN> keyIdentifier " << keyIdentifier
+					<< " StartKeyIdentifier " << m_options.StartKeyIdentifier
+					<< " EndKeyIdentifier " << m_options.EndKeyIdentifier;
 			return false;
+		}
 
-		if (keyIdentifier.KeyId >= m_options.Dilution)
+		if (keyIdentifier.KeyId >= m_options.Dilution) {
+			CATAPULT_LOG(debug) << "<FIN> keyIdentifier " << keyIdentifier << " Dilution " << m_options.Dilution;
 			return false;
+		}
 
 		return true;
 	}
 
 	OtsTreeSignature OtsTree::sign(const OtsKeyIdentifier& keyIdentifier, const RawBuffer& dataBuffer) {
+		CATAPULT_LOG(debug) << "<FIN> signing with " << keyIdentifier;
 		if (!canSign(keyIdentifier))
 			CATAPULT_THROW_RUNTIME_ERROR_1("sign called with invalid key identifier", keyIdentifier);
 

@@ -38,6 +38,7 @@ namespace catapult { namespace finalization {
 			CATAPULT_THROW_INVALID_ARGUMENT("epoch zero is not supported");
 
 		auto votingSetHeight = model::CalculateVotingSetEndHeight(epoch - FinalizationEpoch(1), m_config.VotingSetGrouping);
+		CATAPULT_LOG(debug) << "<FIN> creating finalization context for epoch " << epoch << " with grouped height " << votingSetHeight;
 		return model::FinalizationContext(
 				epoch,
 				votingSetHeight,

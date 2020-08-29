@@ -71,17 +71,26 @@ namespace catapult { namespace chain {
 
 	bool RoundContext::isCompletable() const {
 		auto bestPrevoteResultPair = tryFindBestPrevote();
-		if (!bestPrevoteResultPair.second)
+		if (!bestPrevoteResultPair.second) {
+			CATAPULT_LOG(debug) << "<FIN> not completable - no best prevote";
 			return false;
+		}
 
 		// Erv < g(Vrv) is always completable
 		auto estimateResultPair = tryFindEstimate(bestPrevoteResultPair.first);
-		if (estimateResultPair.second && bestPrevoteResultPair.first != estimateResultPair.first)
+		if (estimateResultPair.second && bestPrevoteResultPair.first != estimateResultPair.first) {
+			CATAPULT_LOG(debug) << "<FIN> completable - Erv < g(Vrv)";
 			return true;
+		}
 
 		// Erv == g(Vrv) is completable if and only if no child of g(Vrv) can have g(Crv)
-		if (canReachPrecommitThreshold(Weights()))
+		if (canReachPrecommitThreshold(Weights())) {
+			CATAPULT_LOG(debug)
+					<< "<FIN> not completable - Erv == g(Vrv) descendant can reach"
+					<< " m_totalWeight " << m_totalWeight
+					<< " m_cumulativePrecommitWeight " << m_cumulativePrecommitWeight;
 			return false;
+		}
 
 		for (auto iter = m_candidates.crbegin(); m_candidates.crend() != iter; ++iter) {
 			// check explicitly because isDescendant includes self
@@ -89,8 +98,14 @@ namespace catapult { namespace chain {
 				continue;
 
 			// if any `best prevote` descendant can reach precommit threshold, round is not yet completable
-			if (m_tree.isDescendant(bestPrevoteResultPair.first, iter->first) && canReachPrecommitThreshold(iter->second))
+			if (m_tree.isDescendant(bestPrevoteResultPair.first, iter->first) && canReachPrecommitThreshold(iter->second)) {
+				CATAPULT_LOG(debug)
+						<< "<FIN> not completable - Erv == g(Vrv) descendant can reach"
+						<< " m_totalWeight " << m_totalWeight
+						<< " m_cumulativePrecommitWeight " << m_cumulativePrecommitWeight
+						<< " weights PV " << iter->second.Prevote << " PC " << iter->second.Precommit;
 				return false;
+			}
 		}
 
 		return true;

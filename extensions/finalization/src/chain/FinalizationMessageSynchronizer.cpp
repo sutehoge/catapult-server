@@ -42,10 +42,12 @@ namespace catapult { namespace chain {
 		public:
 			thread::future<model::FinalizationMessageRange> apiCall(const RemoteApiType& api) const {
 				auto filter = m_messageFilterSupplier();
+				CATAPULT_LOG(debug) << "<FIN:debug> requesting messages from point " << filter.first;
 				return api.messages(filter.first, std::move(filter.second));
 			}
 
 			void consume(model::FinalizationMessageRange&& range, const model::NodeIdentity& sourceIdentity) const {
+				CATAPULT_LOG(debug) << "<FIN> consuming " << range.size() << " messages from peer " << sourceIdentity;
 				m_messageRangeConsumer(model::AnnotatedEntityRange<model::FinalizationMessage>(std::move(range), sourceIdentity));
 			}
 

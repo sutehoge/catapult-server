@@ -122,6 +122,10 @@ namespace catapult { namespace chain {
 				auto startingHeight = m_nextHashesHeight;
 				auto maxHashes = m_options.HashesPerBatch;
 
+				CATAPULT_LOG(debug)
+						<< "<SYNC> localHeight "<< m_localHeight
+						<< "startingHeight " << startingHeight
+						<< " maxHashes " << maxHashes;
 				return thread::when_all(m_local.hashesFrom(startingHeight, maxHashes), m_remote.hashesFrom(startingHeight, maxHashes))
 					.then([pThis = shared_from_this(), startingHeight](auto&& aggregateFuture) {
 						auto hashesFuture = aggregateFuture.get();

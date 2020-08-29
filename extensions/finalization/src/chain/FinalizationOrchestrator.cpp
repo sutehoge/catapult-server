@@ -26,6 +26,18 @@
 
 namespace catapult { namespace chain {
 
+	namespace {
+		void LogMessage(const model::FinalizationMessage& message) {
+			auto messageDescription = model::FinalizationStage::Prevote == message.StepIdentifier.Stage ? "prevote" : "precommit";
+			CATAPULT_LOG(debug)
+					<< "<FIN> preparing " << messageDescription << " for " << message.StepIdentifier
+					<< " at " << message.Height
+					<< " from " << message.Signature.Root.ParentPublicKey;
+			for (auto i = 0u; i < message.HashesCount; ++i)
+				CATAPULT_LOG(debug) << "<FIN> + " << message.HashesPtr()[i];
+		}
+	}
+
 	FinalizationOrchestrator::FinalizationOrchestrator(
 			const VotingStatus& votingStatus,
 			const StageAdvancerFactory& stageAdvancerFactory,
@@ -57,27 +69,37 @@ namespace catapult { namespace chain {
 
 	void FinalizationOrchestrator::poll(Timestamp time) {
 		// on first call to poll, don't call startRound in order to use original values for m_hasSentPrevote and m_hasSentPrecommit
-		if (!m_pStageAdvancer)
+		if (!m_pStageAdvancer) {
+			CATAPULT_LOG(debug) << "<FIN> starting initial round at " << m_pointRaw;
 			m_pStageAdvancer = m_stageAdvancerFactory(point(), time);
+		}
 
 		if (!m_hasSentPrevote && m_pStageAdvancer->canSendPrevote(time)) {
-			m_messageSink(m_pMessageFactory->createPrevote(FinalizationPoint(m_pointRaw)));
+			CATAPULT_LOG(debug) << "<FIN> sending prevote for " << m_pointRaw;
+			auto pMessage = m_pMessageFactory->createPrevote(FinalizationPoint(m_pointRaw));
+			LogMessage(*pMessage);
+			m_messageSink(std::move(pMessage));
 			m_hasSentPrevote = true;
 		}
 
 		model::HeightHashPair commitTarget;
 		if (!m_hasSentPrecommit && m_pStageAdvancer->canSendPrecommit(time, commitTarget)) {
-			m_messageSink(m_pMessageFactory->createPrecommit(FinalizationPoint(m_pointRaw), commitTarget.Height, commitTarget.Hash));
+			CATAPULT_LOG(debug) << "<FIN> sending prevote for " << m_pointRaw;
+			auto pMessage = m_pMessageFactory->createPrecommit(FinalizationPoint(m_pointRaw), commitTarget.Height, commitTarget.Hash);
+			LogMessage(*pMessage);
+			m_messageSink(std::move(pMessage));
 			m_hasSentPrecommit = true;
 		}
 
 		if (m_hasSentPrecommit && m_pStageAdvancer->canStartNextRound()) {
 			++m_pointRaw;
 			startRound(time);
+			CATAPULT_LOG(debug) << "<FIN> advancing to round " << m_pointRaw;
 		}
 	}
 
 	void FinalizationOrchestrator::startRound(Timestamp time) {
+		CATAPULT_LOG(debug) << "<FIN> starting round at " << point() << ", " << time;
 		m_hasSentPrevote = false;
 		m_hasSentPrecommit = false;
 		m_pStageAdvancer = m_stageAdvancerFactory(point(), time);
@@ -94,6 +116,11 @@ namespace catapult { namespace chain {
 
 			if (proofStorage.view().statistics().Height == bestPrecommitDescriptor.Target.Height)
 				return;
+
+			CATAPULT_LOG(important)
+					<< "<FIN> finalizing block for point " << bestPrecommitDescriptor.Point
+					<< " at " << bestPrecommitDescriptor.Target.Height
+					<< " with " << bestPrecommitDescriptor.Target.Hash;
 
 			auto pProof = CreateFinalizationProof(
 					{ bestPrecommitDescriptor.Point, bestPrecommitDescriptor.Target.Height, bestPrecommitDescriptor.Target.Hash },

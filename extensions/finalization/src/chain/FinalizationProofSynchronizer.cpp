@@ -51,8 +51,12 @@ namespace catapult { namespace chain {
 						Height(localFinalizedHeight.unwrap() + m_votingSetGrouping),
 						m_votingSetGrouping);
 
-				if (nextProofHeight >= localChainHeight)
+				if (nextProofHeight >= localChainHeight) {
+					CATAPULT_LOG(debug)
+							<< "<FIN:debug> skipping proof pull; next = " << nextProofHeight
+							<< ", local = " << localChainHeight;
 					return thread::make_ready_future(ionet::NodeInteractionResultCode::Neutral);
+				}
 
 				auto startFuture = thread::compose(
 					api.finalizationStatistics(),
@@ -68,8 +72,10 @@ namespace catapult { namespace chain {
 				return startFuture.then([&proofStorage, proofValidator, nextProofHeight](auto&& proofFuture) {
 					try {
 						auto pProof = proofFuture.get();
-						if (!pProof)
+						if (!pProof) {
+							CATAPULT_LOG(debug) << "<FIN:debug> could not receive proof at " << nextProofHeight;
 							return ionet::NodeInteractionResultCode::Neutral;
+						}
 
 						CATAPULT_LOG(debug) << "peer returned proof for height " << nextProofHeight;
 

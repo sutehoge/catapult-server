@@ -104,6 +104,7 @@ namespace catapult { namespace handlers {
 				if (!info.pRequest)
 					return;
 
+				CATAPULT_LOG(debug) << "requested " << info.pRequest->NumHashes << " hashes, local max: " << maxHashes;
 				auto numHashes = ClampNumHashes(info, maxHashes);
 				auto hashRange = storageView.loadHashesFrom(info.pRequest->Height, numHashes);
 				auto payload = ionet::PacketPayloadFactory::FromFixedSizeRange(RequestType::Packet_Type, std::move(hashRange));

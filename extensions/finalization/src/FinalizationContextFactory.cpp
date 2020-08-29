@@ -34,6 +34,9 @@ namespace catapult { namespace finalization {
 
 	model::FinalizationContext FinalizationContextFactory::create(FinalizationPoint point, Height height) const {
 		auto votingSetHeight = model::CalculateGroupedHeight<Height>(height, m_config.VotingSetGrouping);
+		CATAPULT_LOG(debug)
+				<< "<FIN> creating finalization context for " << point << " at " << height
+				<< " (grouped = " << votingSetHeight << ")";
 		return model::FinalizationContext(
 				point,
 				votingSetHeight,

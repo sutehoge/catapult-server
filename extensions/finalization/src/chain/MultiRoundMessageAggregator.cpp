@@ -120,21 +120,28 @@ namespace catapult { namespace chain {
 	RoundMessageAggregator::UnknownMessages MultiRoundMessageAggregatorView::unknownMessages(
 			FinalizationPoint point,
 			const utils::ShortHashesSet& knownShortHashes) const {
+		CATAPULT_LOG(debug) << "<FIN:debug> finding unknownMessages for point " << point;
+
 		uint64_t totalSize = 0;
 		RoundMessageAggregator::UnknownMessages allMessages;
 		for (const auto& pair : m_state.RoundMessageAggregators) {
-			if (pair.first < point)
+			if (pair.first < point) {
+				CATAPULT_LOG(debug) << "<FIN:debug> skipping aggregator with " << point;
 				continue;
+			}
 
 			for (const auto& pMessage : pair.second->unknownMessages(knownShortHashes)) {
 				totalSize += pMessage->Size;
-				if (totalSize > m_state.MaxResponseSize)
+				if (totalSize > m_state.MaxResponseSize) {
+					CATAPULT_LOG(debug) << "<FIN:debug> returning " << allMessages.size() << "messages (limit)";
 					return allMessages;
+				}
 
 				allMessages.push_back(pMessage);
 			}
 		}
 
+		CATAPULT_LOG(debug) << "<FIN:debug> returning " << allMessages.size() << "messages (all)";
 		return allMessages;
 	}
 
@@ -153,11 +160,17 @@ namespace catapult { namespace chain {
 		if (m_state.MinFinalizationPoint > point)
 			CATAPULT_THROW_INVALID_ARGUMENT("cannot set max finalization point below min");
 
+		CATAPULT_LOG(debug) << "<FIN> setting max finalization point to " << point;
 		m_state.MaxFinalizationPoint = point;
 	}
 
 	RoundMessageAggregatorAddResult MultiRoundMessageAggregatorModifier::add(const std::shared_ptr<model::FinalizationMessage>& pMessage) {
 		auto messagePoint = pMessage->StepIdentifier.Point;
+
+		CATAPULT_LOG(info)
+			<< " min:" << m_state.MinFinalizationPoint
+			<< " max:" << m_state.MaxFinalizationPoint
+			<< " msg:" << messagePoint;
 		if (m_state.MinFinalizationPoint > messagePoint || m_state.MaxFinalizationPoint < messagePoint)
 			return RoundMessageAggregatorAddResult::Failure_Invalid_Point;
 
@@ -168,6 +181,7 @@ namespace catapult { namespace chain {
 					m_state.RoundMessageAggregatorFactory(messagePoint, pMessage->Height)).first;
 		}
 
+		CATAPULT_LOG(debug) << "<FIN> adding message to aggregator at " << messagePoint << " with height " << pMessage->Height;
 		return iter->second->add(pMessage);
 	}
 
@@ -194,6 +208,7 @@ namespace catapult { namespace chain {
 			}
 		}
 
+		CATAPULT_LOG(debug) << "<FIN> pruning  MultiRoundMessageAggregator: " << roundMessageAggregators.cbegin()->first;
 		roundMessageAggregators.erase(roundMessageAggregators.cbegin(), lastMatchingIter);
 		m_state.MinFinalizationPoint = lastMatchingIter->first;
 	}

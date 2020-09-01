@@ -26,42 +26,6 @@ namespace catapult { namespace model {
 
 #pragma pack(push, 1)
 
-	// region finalization round
-
-	///  Finalization round composed of an epoch and point.
-	struct FinalizationRound {
-	public:
-		/// Finalization epoch.
-		FinalizationEpoch Epoch;
-
-		/// Finalization point.
-		FinalizationPoint Point;
-
-	public:
-		/// Returns \c true if this round is equal to \a rhs.
-		bool operator==(const FinalizationRound& rhs) const;
-
-		/// Returns \c true if this round is not equal to \a rhs.
-		bool operator!=(const FinalizationRound& rhs) const;
-
-		/// Returns \c true if this round is less than \a rhs.
-		bool operator<(const FinalizationRound& rhs) const;
-
-		/// Returns \c true if this round is less than or equal to \a rhs.
-		bool operator<=(const FinalizationRound& rhs) const;
-
-		/// Returns \c true if this round is greater than \a rhs.
-		bool operator>(const FinalizationRound& rhs) const;
-
-		/// Returns \c true if this round is greater than or equal to \a rhs.
-		bool operator>=(const FinalizationRound& rhs) const;
-	};
-
-	/// Insertion operator for outputting \a round to \a out.
-	std::ostream& operator<<(std::ostream& out, const FinalizationRound& round);
-
-	// endregion
-
 	// region step identifier
 
 	/// Finalization stages.

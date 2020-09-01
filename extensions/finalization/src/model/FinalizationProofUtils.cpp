@@ -59,13 +59,13 @@ namespace catapult { namespace model {
 				return false;
 			}
 
-		MutableMessageGroups GroupMessages(FinalizationEpoch epoch, FinalizationPoint point, const ConstMessages& messages) {
+		MutableMessageGroups GroupMessages(const model::FinalizationRound& round, const ConstMessages& messages) {
 			MessageSignatureGroups messageSignatureGroups;
 			for (const auto& pMessage : messages) {
-				if (!RequireEqual(epoch, pMessage->StepIdentifier.Epoch, "epoch"))
+				if (!RequireEqual(round.Epoch, pMessage->StepIdentifier.Epoch, "epoch"))
 					continue;
 
-				if (!RequireEqual(point, pMessage->StepIdentifier.Point, "point"))
+				if (!RequireEqual(round.Point, pMessage->StepIdentifier.Point, "point"))
 					continue;
 
 				auto iter = messageSignatureGroups.find(pMessage);
@@ -133,9 +133,8 @@ namespace catapult { namespace model {
 	}
 
 	std::unique_ptr<FinalizationProof> CreateFinalizationProof(const FinalizationStatistics& statistics, const ConstMessages& messages) {
-		auto pProof = GenerateProofWithMessageGroups(GroupMessages(statistics.Epoch, statistics.Point, messages));
-		pProof->Epoch = statistics.Epoch;
-		pProof->Point = statistics.Point;
+		auto pProof = GenerateProofWithMessageGroups(GroupMessages(statistics.Round, messages));
+		pProof->Round = statistics.Round;
 		pProof->Height = statistics.Height;
 		pProof->Hash = statistics.Hash;
 		return pProof;

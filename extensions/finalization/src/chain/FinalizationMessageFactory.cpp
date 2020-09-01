@@ -37,7 +37,7 @@ namespace catapult { namespace chain {
 		std::pair<FinalizationEpoch, Height> LoadFinalizationState(const io::ProofStorageCache& proofStorage) {
 			auto view = proofStorage.view();
 			auto finalizationStatistics = view.statistics();
-			return std::make_pair(finalizationStatistics.Epoch, finalizationStatistics.Height);
+			return std::make_pair(finalizationStatistics.Round.Epoch, finalizationStatistics.Height);
 		}
 
 		Hash256 LoadLastFinalizedHash(const io::ProofStorageCache& proofStorage) {

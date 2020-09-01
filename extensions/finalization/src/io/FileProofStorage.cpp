@@ -98,7 +98,7 @@ namespace catapult { namespace io {
 		if (FinalizationPoint() == point)
 			CATAPULT_THROW_INVALID_ARGUMENT("loadProof called with point 0");
 
-		auto currentPoint = statistics().Point;
+		auto currentPoint = statistics().Round.Point;
 		if (currentPoint < point) {
 			std::ostringstream out;
 			out << "cannot load proof with point " << point << " when storage point is " << currentPoint;
@@ -130,9 +130,9 @@ namespace catapult { namespace io {
 
 	void FileProofStorage::saveProof(const model::FinalizationProof& proof) {
 		auto currentStatistics = statistics();
-		if (currentStatistics.Point > proof.Point) {
+		if (currentStatistics.Round.Point > proof.Round.Point) {
 			std::ostringstream out;
-			out << "cannot save proof with point " << proof.Point << " when storage point is " << currentStatistics.Point;
+			out << "cannot save proof with point " << proof.Round << " when storage point is " << currentStatistics.Round;
 			CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
 		}
 
@@ -143,22 +143,23 @@ namespace catapult { namespace io {
 		}
 
 		{
-			auto pProofFile = OpenProofFile(m_dataDirectory, proof.Point, OpenMode::Read_Write);
+			auto pProofFile = OpenProofFile(m_dataDirectory, proof.Round.Point, OpenMode::Read_Write);
 			BufferedOutputFileStream stream(std::move(*pProofFile));
 			stream.write({ reinterpret_cast<const uint8_t*>(&proof), proof.Size });
 			stream.flush();
 		}
 
 		// fill gaps in mapping file - this works because loadProof(Height) returns latest proof with matching height
-		for (auto point = currentStatistics.Point + FinalizationPoint(1); point <= proof.Point; point = point + FinalizationPoint(1))
+		auto point = point = currentStatistics.Round.Point + FinalizationPoint(1);
+		for (auto ; point <= proof.Round.Point; point = point + FinalizationPoint(1))
 			m_pointHeightMapping.save(point, proof.Height);
 
-		m_indexFile.set({ proof.Epoch, proof.Point, proof.Height, proof.Hash });
+		m_indexFile.set({ proof.Round, proof.Height, proof.Hash });
 	}
 
 	FinalizationPoint FileProofStorage::findPointForHeight(Height height) const {
 		constexpr auto Max_Points_In_Batch = FinalizationPoint(100);
-		auto currentPoint = statistics().Point;
+		auto currentPoint = statistics().Round.Point;
 
 		while (true) {
 			auto rangeBeginPoint = currentPoint > Max_Points_In_Batch ? (currentPoint - Max_Points_In_Batch) : FinalizationPoint(1);

@@ -271,10 +271,6 @@ namespace catapult { namespace finalization {
 	}
 
 	namespace {
-		model::StepIdentifier CreateStepIdentifier(uint64_t epoch, uint64_t point, model::FinalizationStage stage) {
-			return { FinalizationEpoch(epoch), FinalizationPoint(point), stage };
-		}
-
 		void AssertCanRunFinalizationTaskWhenThereArePendingFinalizedBlocks(
 				size_t numRepetitions,
 				FinalizationPoint expectedMaxFinalizationPoint) {
@@ -308,8 +304,8 @@ namespace catapult { namespace finalization {
 
 				// - two messages were sent
 				ASSERT_EQ(2u, messages.size());
-				EXPECT_EQ(CreateStepIdentifier(1, 8, Prevote_Stage), messages[0]->StepIdentifier);
-				EXPECT_EQ(CreateStepIdentifier(1, 8, Precommit_Stage), messages[1]->StepIdentifier);
+				EXPECT_EQ(test::CreateStepIdentifier(1, 8, Prevote_Stage), messages[0]->StepIdentifier);
+				EXPECT_EQ(test::CreateStepIdentifier(1, 8, Precommit_Stage), messages[1]->StepIdentifier);
 
 				// - voting status was changed
 				auto votingStatus = context.votingStatus();

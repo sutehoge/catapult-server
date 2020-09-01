@@ -87,9 +87,6 @@ namespace catapult {
 	struct FinalizationPoint_tag {};
 	using FinalizationPoint = utils::BaseValue<uint64_t, FinalizationPoint_tag>;
 
-	struct FinalizationEpoch_tag {};
-	using FinalizationEpoch = utils::BaseValue<uint64_t, FinalizationEpoch_tag>;
-
 	struct BlockDuration_tag {};
 	using BlockDuration = utils::BaseValue<uint64_t, BlockDuration_tag>;
 

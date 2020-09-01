@@ -97,7 +97,7 @@ namespace catapult { namespace chain {
 			auto bestPrecommitResultPair = iter->second->roundContext().tryFindBestPrecommit();
 			if (bestPrecommitResultPair.second) {
 				BestPrecommitDescriptor descriptor;
-				descriptor.Epoch = FinalizationEpoch(0); // TODO;
+				descriptor.Epoch = FinalizationEpoch(0); // TODO: this will need to come from first
 				descriptor.Point = iter->first;
 				descriptor.Target = bestPrecommitResultPair.first;
 				descriptor.Proof = iter->second->unknownMessages({});

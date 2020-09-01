@@ -31,6 +31,16 @@ namespace catapult {
 
 namespace catapult { namespace test {
 
+	// region step identifier factories
+
+	/// Creates a step identifier with the specified \a point.
+	model::StepIdentifier CreateStepIdentifierWithPoint(uint64_t point);
+
+	/// Creates a step identifier with the specified \a epoch, \a point and \a stage.
+	model::StepIdentifier CreateStepIdentifier(uint64_t epoch, uint64_t point, model::FinalizationStage stage);
+
+	// endregion
+
 	// region message factories
 
 	/// Creates a finalization message with one hash for \a point.

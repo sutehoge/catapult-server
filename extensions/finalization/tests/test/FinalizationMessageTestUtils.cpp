@@ -31,6 +31,18 @@
 
 namespace catapult { namespace test {
 
+	// region step identifier factories
+
+	model::StepIdentifier CreateStepIdentifierWithPoint(uint64_t point) {
+		return CreateStepIdentifier(3, point, model::FinalizationStage::Prevote);
+	}
+
+	model::StepIdentifier CreateStepIdentifier(uint64_t epoch, uint64_t point, model::FinalizationStage stage) {
+		return { FinalizationEpoch(epoch), FinalizationPoint(point), stage };
+	}
+
+	// endregion
+
 	// region message factories
 
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(FinalizationPoint point) {

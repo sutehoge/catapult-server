@@ -238,11 +238,7 @@ namespace catapult { namespace finalization {
 	// region FinalizationBootstrapperService - multi round message aggregator
 
 	namespace {
-		constexpr auto Stage = model::FinalizationStage::Prevote;
-
-		model::StepIdentifier CreateStepIdentifier(uint64_t point, model::FinalizationStage stage) {
-			return { FinalizationEpoch(3), FinalizationPoint(point), stage };
-		}
+		constexpr auto CreateStepIdentifier = test::CreateStepIdentifierWithPoint;
 
 		template<typename TAction>
 		void RunMultiRoundMessageAggregatorServiceTest(TAction action) {
@@ -265,7 +261,7 @@ namespace catapult { namespace finalization {
 		RunMultiRoundMessageAggregatorServiceTest([](auto& aggregator, const auto& context, const auto& lastFinalizedHash) {
 			// Act:
 			auto hash = test::GenerateRandomByteArray<Hash256>();
-			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(12, Stage), Height(22), hash));
+			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(12), Height(22), hash));
 
 			// Assert:
 			AssertAggregatorCounters(context, FinalizationPoint(12), FinalizationPoint(12), Height(20), Height(20));
@@ -283,8 +279,8 @@ namespace catapult { namespace finalization {
 
 			// Act:
 			auto hash = test::GenerateRandomByteArray<Hash256>();
-			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(12, Stage), Height(22), hash));
-			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(15, Stage), Height(24), hash));
+			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(12), Height(22), hash));
+			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(15), Height(24), hash));
 
 			// Assert:
 			AssertAggregatorCounters(context, FinalizationPoint(12), FinalizationPoint(15), Height(20), Height(20));
@@ -302,12 +298,12 @@ namespace catapult { namespace finalization {
 
 			// Act:
 			auto hash1 = test::GenerateRandomByteArray<Hash256>();
-			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(12, Stage), Height(22), hash1));
-			aggregator.modifier().add(context.createMessage(VoterType::Large2, CreateStepIdentifier(12, Stage), Height(22), hash1));
+			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(12), Height(22), hash1));
+			aggregator.modifier().add(context.createMessage(VoterType::Large2, CreateStepIdentifier(12), Height(22), hash1));
 
 			auto hash2 = test::GenerateRandomByteArray<Hash256>();
-			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(15, Stage), Height(24), hash2));
-			aggregator.modifier().add(context.createMessage(VoterType::Large2, CreateStepIdentifier(15, Stage), Height(24), hash2));
+			aggregator.modifier().add(context.createMessage(VoterType::Large1, CreateStepIdentifier(15), Height(24), hash2));
+			aggregator.modifier().add(context.createMessage(VoterType::Large2, CreateStepIdentifier(15), Height(24), hash2));
 
 			// Assert:
 			AssertAggregatorCounters(context, FinalizationPoint(12), FinalizationPoint(15), Height(22), Height(24));

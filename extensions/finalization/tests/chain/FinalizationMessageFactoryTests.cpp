@@ -112,10 +112,6 @@ namespace catapult { namespace chain {
 	// region createPrevote
 
 	namespace {
-		model::StepIdentifier CreateStepIdentifier(uint64_t epoch, uint64_t point, model::FinalizationStage stage) {
-			return { FinalizationEpoch(epoch), FinalizationPoint(point), stage };
-		}
-
 		void AssertPrevote(
 				const model::FinalizationMessage& message,
 				const TestContext& context,
@@ -171,7 +167,7 @@ namespace catapult { namespace chain {
 		EXPECT_EQ(sizeof(model::FinalizationMessage) + Hash256::Size, pMessage->Size);
 		ASSERT_EQ(1u, pMessage->HashesCount);
 
-		EXPECT_EQ(CreateStepIdentifier(3, 20, model::FinalizationStage::Prevote), pMessage->StepIdentifier);
+		EXPECT_EQ(test::CreateStepIdentifier(3, 20, model::FinalizationStage::Prevote), pMessage->StepIdentifier);
 		EXPECT_EQ(Height(8), pMessage->Height);
 		EXPECT_EQ(context.lastFinalizedHash(), pMessage->HashesPtr()[0]);
 
@@ -262,7 +258,7 @@ namespace catapult { namespace chain {
 		EXPECT_EQ(sizeof(model::FinalizationMessage) + Hash256::Size, pMessage->Size);
 		ASSERT_EQ(1u, pMessage->HashesCount);
 
-		EXPECT_EQ(CreateStepIdentifier(3, 20, model::FinalizationStage::Precommit), pMessage->StepIdentifier);
+		EXPECT_EQ(test::CreateStepIdentifier(3, 20, model::FinalizationStage::Precommit), pMessage->StepIdentifier);
 		EXPECT_EQ(Height(35), pMessage->Height);
 		EXPECT_EQ(hash, pMessage->HashesPtr()[0]);
 

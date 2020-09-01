@@ -426,7 +426,7 @@ namespace catapult { namespace chain {
 			auto epoch = Finalization_Epoch;
 			auto point = Finalization_Point;
 			auto height = Last_Finalized_Height + Height(1);
-			return test::CreatePrevoteMessages(epoch, point, height, numMessages, pHashes, index);
+			return test::CreatePrecommitMessages(epoch, point, height, numMessages, pHashes, index);
 		}
 	}
 

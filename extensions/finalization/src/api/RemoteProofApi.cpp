@@ -63,13 +63,13 @@ namespace catapult { namespace api {
 			}
 		};
 
-		struct ProofAtRoundTraits : public BasicProofAtTraits {
+		struct ProofAtEpochTraits : public BasicProofAtTraits {
 		public:
-			static constexpr auto Friendly_Name = "proof at point";
+			static constexpr auto Friendly_Name = "proof at epoch";
 
-			static auto CreateRequestPacketPayload(const model::FinalizationRound& round) {
-				auto pPacket = ionet::CreateSharedPacket<ProofAtRoundRequest>();
-				pPacket->Round = round;
+			static auto CreateRequestPacketPayload(FinalizationEpoch epoch) {
+				auto pPacket = ionet::CreateSharedPacket<ProofAtEpochRequest>();
+				pPacket->Epoch = epoch;
 				return ionet::PacketPayload(pPacket);
 			}
 		};
@@ -103,8 +103,8 @@ namespace catapult { namespace api {
 				return m_impl.dispatch(FinalizationStatisticsTraits());
 			}
 
-			FutureType<ProofAtRoundTraits> proofAt(const model::FinalizationRound& round) const override {
-				return m_impl.dispatch(ProofAtRoundTraits(), round);
+			FutureType<ProofAtEpochTraits> proofAt(FinalizationEpoch epoch) const override {
+				return m_impl.dispatch(ProofAtEpochTraits(), epoch);
 			}
 
 			FutureType<ProofAtHeightTraits> proofAt(Height height) const override {

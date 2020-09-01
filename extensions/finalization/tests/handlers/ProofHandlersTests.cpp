@@ -80,7 +80,7 @@ namespace catapult { namespace handlers {
 
 	// endregion
 
-	// region FinalizationProofAt(Point|Height)Handler
+	// region FinalizationProofAt(Epoch|Height)Handler
 
 	namespace {
 		auto CreateProof() {
@@ -99,17 +99,17 @@ namespace catapult { namespace handlers {
 			return io::ProofStorageCache(std::move(pProofStorage));
 		}
 
-		struct ProofAtPointTraits {
-			static constexpr auto Register = RegisterFinalizationProofAtPointHandler;
+		struct ProofAtEpochTraits {
+			static constexpr auto Register = RegisterFinalizationProofAtEpochHandler;
 
 			static auto CreatePacketWithIdentifier(int64_t delta) {
-				auto pPacket = ionet::CreateSharedPacket<api::ProofAtPointRequest>();
+				auto pPacket = ionet::CreateSharedPacket<api::ProofAtEpochRequest>();
 				pPacket->Point = FinalizationPoint(static_cast<uint64_t>(8 + delta));
 				return pPacket;
 			}
 
 			static auto CreatePacketWithZeroIdentifier() {
-				auto pPacket = ionet::CreateSharedPacket<api::ProofAtPointRequest>();
+				auto pPacket = ionet::CreateSharedPacket<api::ProofAtEpochRequest>();
 				pPacket->Point = FinalizationPoint();
 				return pPacket;
 			}
@@ -134,7 +134,7 @@ namespace catapult { namespace handlers {
 
 #define PROOF_AT_TEST(TEST_NAME) \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)(); \
-	TEST(TEST_CLASS, FinalizationProofAtPointHandler_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ProofAtPointTraits>(); } \
+	TEST(TEST_CLASS, FinalizationProofAtEpochHandler_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ProofAtEpochTraits>(); } \
 	TEST(TEST_CLASS, FinalizationProofAtHeightHandler_##TEST_NAME) { TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)<ProofAtHeightTraits>(); } \
 	template<typename TTraits> void TRAITS_TEST_NAME(TEST_CLASS, TEST_NAME)()
 

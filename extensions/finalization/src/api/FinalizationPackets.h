@@ -41,11 +41,11 @@ namespace catapult { namespace api {
 	};
 
 	/// Request packet for a proof at a finalization round.
-	struct ProofAtRoundRequest : public ionet::Packet {
-		static constexpr ionet::PacketType Packet_Type = ionet::PacketType::Finalization_Proof_At_Round;
+	struct ProofAtEpochRequest : public ionet::Packet {
+		static constexpr ionet::PacketType Packet_Type = ionet::PacketType::Finalization_Proof_At_Epoch;
 
-		/// Requested finalization proof round.
-		model::FinalizationRound Round;
+		/// Requested finalization proof epoch.
+		FinalizationEpoch Epoch;
 	};
 
 	/// Request packet for a proof at a finalization height.

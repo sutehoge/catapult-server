@@ -58,13 +58,13 @@ namespace catapult { namespace api {
 			}
 		};
 
-		struct ProofAtPointInvoker {
+		struct ProofAtEpochInvoker {
 			static auto Invoke(const RemoteProofApi& api) {
 				return api.proofAt(FinalizationPoint(123));
 			}
 
 			static void ValidateRequest(const ionet::Packet& packet) {
-				const auto* pRequest = ionet::CoercePacket<ProofAtPointRequest>(&packet);
+				const auto* pRequest = ionet::CoercePacket<ProofAtEpochRequest>(&packet);
 				ASSERT_TRUE(!!pRequest);
 				EXPECT_EQ(FinalizationPoint(123), pRequest->Point);
 			}
@@ -111,7 +111,7 @@ namespace catapult { namespace api {
 			}
 		};
 
-		using ProofAtPointTraits = ProofAtTraitsT<ProofAtPointInvoker>;
+		using ProofAtEpochTraits = ProofAtTraitsT<ProofAtEpochInvoker>;
 		using ProofAtHeightTraits = ProofAtTraitsT<ProofAtHeightInvoker>;
 
 		struct RemoteProofApiTraits {
@@ -127,6 +127,6 @@ namespace catapult { namespace api {
 
 	DEFINE_REMOTE_API_TESTS(RemoteProofApi)
 	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteProofApi, FinalizationStatistics)
-	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteProofApi, ProofAtPoint)
+	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteProofApi, ProofAtEpoch)
 	DEFINE_REMOTE_API_TESTS_EMPTY_RESPONSE_INVALID(RemoteProofApi, ProofAtHeight)
 }}

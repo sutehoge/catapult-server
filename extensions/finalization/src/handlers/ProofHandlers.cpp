@@ -48,13 +48,13 @@ namespace catapult { namespace handlers {
 	}
 
 	namespace {
-		struct ProofAtRoundTraits {
-			using RequestType = api::ProofAtRoundRequest;
+		struct ProofAtEpochTraits {
+			using RequestType = api::ProofAtEpochRequest;
 
 			static auto LoadProof(const io::ProofStorageView& proofStorageView, const RequestType& request) {
-				return model::FinalizationRound() == request.Round || request.Round > proofStorageView.statistics().Round
+				return FinalizationEpoch() == request.Epoch || request.Epoch > proofStorageView.statistics().Round.Epoch
 						? nullptr
-						: proofStorageView.loadProof(request.Round.Point); // TODO: should be round
+						: proofStorageView.loadProof(request.Epoch);
 			}
 		};
 
@@ -91,10 +91,10 @@ namespace catapult { namespace handlers {
 		}
 	}
 
-	void RegisterFinalizationProofAtRoundHandler(ionet::ServerPacketHandlers& handlers, const io::ProofStorageCache& proofStorage) {
+	void RegisterFinalizationProofAtEpochHandler(ionet::ServerPacketHandlers& handlers, const io::ProofStorageCache& proofStorage) {
 		handlers.registerHandler(
-				ionet::PacketType::Finalization_Proof_At_Round,
-				CreateFinalizationProofHandler<ProofAtRoundTraits>(proofStorage));
+				ionet::PacketType::Finalization_Proof_At_Epoch,
+				CreateFinalizationProofHandler<ProofAtEpochTraits>(proofStorage));
 	}
 
 	void RegisterFinalizationProofAtHeightHandler(ionet::ServerPacketHandlers& handlers, const io::ProofStorageCache& proofStorage) {

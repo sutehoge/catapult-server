@@ -50,7 +50,7 @@ namespace catapult { namespace finalization {
 				// register handlers
 				auto& packetHandlers = state.packetHandlers();
 				handlers::RegisterFinalizationStatisticsHandler(packetHandlers, proofStorage);
-				handlers::RegisterFinalizationProofAtRoundHandler(packetHandlers, proofStorage);
+				handlers::RegisterFinalizationProofAtEpochHandler(packetHandlers, proofStorage);
 				handlers::RegisterFinalizationProofAtHeightHandler(packetHandlers, proofStorage);
 
 				if (m_enableVoting) {

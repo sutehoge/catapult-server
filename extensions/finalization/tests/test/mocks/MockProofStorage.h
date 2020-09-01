@@ -78,14 +78,14 @@ namespace catapult { namespace mocks {
 
 	public:
 		model::FinalizationStatistics statistics() const override {
-			return { m_epoch, m_point, m_height, m_hash };
+			return { { m_epoch, m_point }, m_height, m_hash };
 		}
 
-		std::shared_ptr<const model::FinalizationProof> loadProof(FinalizationPoint point) const override {
-			if (FinalizationPoint() == point || point > m_point)
-				CATAPULT_THROW_INVALID_ARGUMENT("point must be nonzero and no greater than finalizationPoint");
+		std::shared_ptr<const model::FinalizationProof> loadProof(FinalizationEpoch epoch) const override {
+			if (FinalizationEpoch() == epoch || epoch > m_epoch)
+				CATAPULT_THROW_INVALID_ARGUMENT("epoch must be nonzero and no greater than finalizationPoint");
 
-			return m_point == point ? m_pProof : nullptr;
+			return m_epoch == epoch ? m_pProof : nullptr;
 		}
 
 		std::shared_ptr<const model::FinalizationProof> loadProof(Height height) const override {
@@ -96,12 +96,12 @@ namespace catapult { namespace mocks {
 		}
 
 		void saveProof(const model::FinalizationProof& proof) override {
-			m_epoch = proof.Epoch;
-			m_point = proof.Point;
+			m_epoch = proof.Round.Epoch;
+			m_point = proof.Round.Point;
 			m_height = proof.Height;
 			m_hash = proof.Hash;
 
-			m_savedProofDescriptors.push_back(model::FinalizationStatistics{ m_epoch, m_point, m_height, m_hash });
+			m_savedProofDescriptors.push_back(statistics());
 		}
 
 	private:

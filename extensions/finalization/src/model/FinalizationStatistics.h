@@ -27,6 +27,9 @@ namespace catapult { namespace model {
 
 	/// Finalization statistics.
 	struct FinalizationStatistics {
+		/// Finalization epoch.
+		FinalizationEpoch Epoch;
+
 		/// Finalization point.
 		FinalizationPoint Point;
 

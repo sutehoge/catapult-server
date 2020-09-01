@@ -31,7 +31,10 @@ namespace catapult { namespace chain {
 
 	/// Describes the best precommit.
 	struct BestPrecommitDescriptor {
-		/// Finalization point that is completed.
+		/// Finalization epoch.
+		FinalizationEpoch Epoch;
+
+		/// Finalization point.
 		FinalizationPoint Point;
 
 		/// Height hash pair corresponding to the block that can be finalized.

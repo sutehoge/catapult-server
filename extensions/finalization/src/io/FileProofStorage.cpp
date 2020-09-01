@@ -153,7 +153,7 @@ namespace catapult { namespace io {
 		for (auto point = currentStatistics.Point + FinalizationPoint(1); point <= proof.Point; point = point + FinalizationPoint(1))
 			m_pointHeightMapping.save(point, proof.Height);
 
-		m_indexFile.set({ proof.Point, proof.Height, proof.Hash });
+		m_indexFile.set({ proof.Epoch, proof.Point, proof.Height, proof.Hash });
 	}
 
 	FinalizationPoint FileProofStorage::findPointForHeight(Height height) const {

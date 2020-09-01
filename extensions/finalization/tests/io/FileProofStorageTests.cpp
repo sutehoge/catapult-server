@@ -18,22 +18,22 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "finalization/src/io/FileProofStorage.h"
-#include "finalization/tests/test/ProofStorageTests.h"
-#include "tests/TestHarness.h"
+// #include "finalization/src/io/FileProofStorage.h"
+// #include "finalization/tests/test/ProofStorageTests.h"
+// #include "tests/TestHarness.h"
 
-namespace catapult { namespace io {
+// namespace catapult { namespace io {
 
-#define TEST_CLASS FileProofStorageTests
+// #define TEST_CLASS FileProofStorageTests
 
-	namespace {
-		struct FileProofStorageTraits {
+// 	namespace {
+// 		struct FileProofStorageTraits {
 
-			static std::unique_ptr<ProofStorage> CreateStorage(const std::string& destination) {
-				return std::make_unique<FileProofStorage>(destination);
-			}
-		};
-	}
+// 			static std::unique_ptr<ProofStorage> CreateStorage(const std::string& destination) {
+// 				return std::make_unique<FileProofStorage>(destination);
+// 			}
+// 		};
+// 	}
 
-	DEFINE_PROOF_STORAGE_TESTS(FileProofStorageTraits)
-}}
+// 	DEFINE_PROOF_STORAGE_TESTS(FileProofStorageTraits)
+// }}

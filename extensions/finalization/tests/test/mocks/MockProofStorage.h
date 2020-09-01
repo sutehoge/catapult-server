@@ -65,7 +65,7 @@ namespace catapult { namespace mocks {
 
 	public:
 		model::FinalizationStatistics statistics() const override {
-			return { m_point, m_height, m_hash };
+			return { m_epoch, m_point, m_height, m_hash };
 		}
 
 		std::shared_ptr<const model::FinalizationProof> loadProof(FinalizationPoint point) const override {
@@ -83,14 +83,16 @@ namespace catapult { namespace mocks {
 		}
 
 		void saveProof(const model::FinalizationProof& proof) override {
+			m_epoch = proof.Epoch;
 			m_point = proof.Point;
 			m_height = proof.Height;
 			m_hash = proof.Hash;
 
-			m_savedProofDescriptors.push_back(model::FinalizationStatistics{ m_point, m_height, m_hash });
+			m_savedProofDescriptors.push_back(model::FinalizationStatistics{ m_epoch, m_point, m_height, m_hash });
 		}
 
 	private:
+		FinalizationEpoch m_epoch;
 		FinalizationPoint m_point;
 		Height m_height;
 		Hash256 m_hash;

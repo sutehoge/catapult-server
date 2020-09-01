@@ -36,6 +36,7 @@ namespace catapult { namespace chain {
 
 	namespace {
 		std::shared_ptr<model::FinalizationMessage> CreateTemplateMessage(
+				FinalizationEpoch epoch,
 				FinalizationPoint point,
 				const model::FinalizationMessageGroup& messageGroup) {
 			uint32_t hashesPayloadSize = static_cast<uint32_t>(messageGroup.HashesCount * Hash256::Size);
@@ -44,7 +45,7 @@ namespace catapult { namespace chain {
 			auto pMessage = utils::MakeSharedWithSize<model::FinalizationMessage>(size);
 			pMessage->Size = size;
 			pMessage->HashesCount = messageGroup.HashesCount;
-			pMessage->StepIdentifier = { point, messageGroup.Stage };
+			pMessage->StepIdentifier = { epoch, point, messageGroup.Stage };
 			pMessage->Height = messageGroup.Height;
 
 			std::memcpy(reinterpret_cast<void*>(pMessage->HashesPtr()), messageGroup.HashesPtr(), hashesPayloadSize);
@@ -63,7 +64,7 @@ namespace catapult { namespace chain {
 
 		auto pMessageAggregator = CreateRoundMessageAggregator(context);
 		for (const auto& messageGroup : proof.MessageGroups()) {
-			auto pTemplateMessage = CreateTemplateMessage(proof.Point, messageGroup);
+			auto pTemplateMessage = CreateTemplateMessage(proof.Epoch, proof.Point, messageGroup);
 			for (auto i = 0u; i < messageGroup.SignaturesCount; ++i) {
 				pTemplateMessage->Signature = messageGroup.SignaturesPtr()[i];
 				auto addResult = pMessageAggregator->add(pTemplateMessage);

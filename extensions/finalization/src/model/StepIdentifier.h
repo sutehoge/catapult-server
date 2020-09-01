@@ -42,6 +42,9 @@ namespace catapult { namespace model {
 
 	/// Finalization step identifier.
 	struct StepIdentifier {
+		/// Finalization epoch.
+		FinalizationEpoch Epoch;
+
 		/// Finalization point.
 		FinalizationPoint Point;
 

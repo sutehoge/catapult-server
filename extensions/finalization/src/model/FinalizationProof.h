@@ -36,6 +36,9 @@ namespace catapult { namespace model {
 		/// Proof version.
 		uint32_t Version;
 
+		/// Finalization epoch.
+		FinalizationEpoch Epoch;
+
 		/// Finalization point.
 		FinalizationPoint Point;
 

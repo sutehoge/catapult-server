@@ -34,7 +34,7 @@ namespace catapult { namespace test {
 	// region message factories
 
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(FinalizationPoint point) {
-		return CreateMessage({ point, model::FinalizationStage::Count }, GenerateRandomByteArray<Hash256>());
+		return CreateMessage({ FinalizationEpoch(), point, model::FinalizationStage::Count }, GenerateRandomByteArray<Hash256>());
 	}
 
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(FinalizationPoint point, Height height) {
@@ -48,7 +48,12 @@ namespace catapult { namespace test {
 	}
 
 	std::unique_ptr<model::FinalizationMessage> CreateMessage(Height height, const Hash256& hash) {
-		auto pMessage = CreateMessage({ FinalizationPoint(Random()), static_cast<model::FinalizationStage>(Random()) }, hash);
+		auto stepIdentifier = model::StepIdentifier{
+			FinalizationEpoch(Random()),
+			FinalizationPoint(Random()),
+			static_cast<model::FinalizationStage>(Random())
+		};
+		auto pMessage = CreateMessage(stepIdentifier, hash);
 		pMessage->Height = height;
 		return pMessage;
 	}
@@ -88,7 +93,7 @@ namespace catapult { namespace test {
 		std::vector<std::shared_ptr<model::FinalizationMessage>> messages;
 		for (auto i = 0u; i < numMessages; ++i) {
 			auto pMessage = CreateMessage(height, static_cast<uint32_t>(numHashes));
-			pMessage->StepIdentifier = { point, model::FinalizationStage::Prevote };
+			pMessage->StepIdentifier = { FinalizationEpoch(), point, model::FinalizationStage::Prevote };
 			std::copy(pHashes, pHashes + numHashes, pMessage->HashesPtr());
 			messages.push_back(std::move(pMessage));
 		}
@@ -105,7 +110,7 @@ namespace catapult { namespace test {
 		std::vector<std::shared_ptr<model::FinalizationMessage>> messages;
 		for (auto i = 0u; i < numMessages; ++i) {
 			auto pMessage = CreateMessage(height + Height(index), 1);
-			pMessage->StepIdentifier = { point, model::FinalizationStage::Precommit };
+			pMessage->StepIdentifier = { FinalizationEpoch(), point, model::FinalizationStage::Precommit };
 			*pMessage->HashesPtr() = pHashes[index];
 			messages.push_back(std::move(pMessage));
 		}

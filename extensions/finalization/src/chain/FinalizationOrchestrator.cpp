@@ -83,6 +83,17 @@ namespace catapult { namespace chain {
 		m_pStageAdvancer = m_stageAdvancerFactory(point(), time);
 	}
 
+	namespace {
+		model::FinalizationStatistics ToFinalizationStatistics(const BestPrecommitDescriptor& bestPrecommitDescriptor) {
+			return {
+				bestPrecommitDescriptor.Epoch,
+				bestPrecommitDescriptor.Point,
+				bestPrecommitDescriptor.Target.Height,
+				bestPrecommitDescriptor.Target.Hash
+			};
+		}
+	}
+
 	action CreateFinalizer(
 			MultiRoundMessageAggregator& messageAggregator,
 			subscribers::FinalizationSubscriber& subscriber,
@@ -95,9 +106,7 @@ namespace catapult { namespace chain {
 			if (proofStorage.view().statistics().Height == bestPrecommitDescriptor.Target.Height)
 				return;
 
-			auto pProof = CreateFinalizationProof(
-					{ bestPrecommitDescriptor.Point, bestPrecommitDescriptor.Target.Height, bestPrecommitDescriptor.Target.Hash },
-					bestPrecommitDescriptor.Proof);
+			auto pProof = CreateFinalizationProof(ToFinalizationStatistics(bestPrecommitDescriptor), bestPrecommitDescriptor.Proof);
 			proofStorage.modifier().saveProof(*pProof);
 			subscriber.notifyFinalizedBlock(
 					bestPrecommitDescriptor.Target.Height,

@@ -35,8 +35,13 @@ namespace catapult { namespace mocks {
 		{}
 
 		/// Creates a proof storage initialized with a proof for \a point, \a height and \a hash.
-		MockProofStorage(FinalizationPoint point, Height height, const Hash256& hash) {
-			setLastFinalization(point, height, hash);
+		MockProofStorage(FinalizationPoint point, Height height, const Hash256& hash)
+				: MockProofStorage(FinalizationEpoch(1), point, height, hash)
+		{}
+
+		/// Creates a proof storage initialized with a proof for \a epoch, \a point, \a height and \a hash.
+		MockProofStorage(FinalizationEpoch epoch, FinalizationPoint point, Height height, const Hash256& hash) {
+			setLastFinalization(epoch, point, height, hash);
 		}
 
 	public:
@@ -53,6 +58,14 @@ namespace catapult { namespace mocks {
 
 		/// Sets the last finalization \a point, \a height and \a hash.
 		void setLastFinalization(FinalizationPoint point, Height height, const Hash256& hash) {
+			m_point = point;
+			m_height = height;
+			m_hash = hash;
+		}
+
+		/// Sets the last finalization \a epoch, \a point, \a height and \a hash.
+		void setLastFinalization(FinalizationEpoch epoch, FinalizationPoint point, Height height, const Hash256& hash) {
+			m_epoch = epoch;
 			m_point = point;
 			m_height = height;
 			m_hash = hash;

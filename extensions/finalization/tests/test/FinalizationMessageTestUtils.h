@@ -56,8 +56,9 @@ namespace catapult { namespace test {
 	// region multi-message factories
 
 	/// Creates \a numMessages prevote messages for the specified hashes (\a numHashes starting at \a pHashes) with specified starting
-	/// \a height and \a point.
+	/// \a height, \a epoch and \a point.
 	std::vector<std::shared_ptr<model::FinalizationMessage>> CreatePrevoteMessages(
+			FinalizationEpoch epoch,
 			FinalizationPoint point,
 			Height height,
 			size_t numMessages,
@@ -65,8 +66,9 @@ namespace catapult { namespace test {
 			size_t numHashes);
 
 	/// Creates \a numMessages precommit messages for the specified hash (at \a index in \a pHashes) with specified starting
-	/// \a height and \a point.
+	/// \a height, \a epoch and \a point.
 	std::vector<std::shared_ptr<model::FinalizationMessage>> CreatePrecommitMessages(
+			FinalizationEpoch epoch,
 			FinalizationPoint point,
 			Height height,
 			size_t numMessages,

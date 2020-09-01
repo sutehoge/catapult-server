@@ -28,7 +28,7 @@ namespace catapult { namespace model {
 
 	// region FinalizationStatistics (size + alignment)
 
-#define STATISTICS_FIELDS FIELD(Point) FIELD(Height) FIELD(Hash)
+#define STATISTICS_FIELDS FIELD(Epoch) FIELD(Point) FIELD(Height) FIELD(Hash)
 
 	TEST(TEST_CLASS, FinalizationStatisticsHasExpectedSize) {
 		// Arrange:
@@ -40,7 +40,7 @@ namespace catapult { namespace model {
 
 		// Assert:
 		EXPECT_EQ(expectedSize, sizeof(FinalizationStatistics));
-		EXPECT_EQ(48u, sizeof(FinalizationStatistics));
+		EXPECT_EQ(56u, sizeof(FinalizationStatistics));
 	}
 
 	TEST(TEST_CLASS, FinalizationStatisticsHasProperAlignment) {

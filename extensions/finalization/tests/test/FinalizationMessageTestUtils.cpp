@@ -85,6 +85,7 @@ namespace catapult { namespace test {
 	// region multi-message factories
 
 	std::vector<std::shared_ptr<model::FinalizationMessage>> CreatePrevoteMessages(
+			FinalizationEpoch epoch,
 			FinalizationPoint point,
 			Height height,
 			size_t numMessages,
@@ -93,7 +94,7 @@ namespace catapult { namespace test {
 		std::vector<std::shared_ptr<model::FinalizationMessage>> messages;
 		for (auto i = 0u; i < numMessages; ++i) {
 			auto pMessage = CreateMessage(height, static_cast<uint32_t>(numHashes));
-			pMessage->StepIdentifier = { FinalizationEpoch(), point, model::FinalizationStage::Prevote };
+			pMessage->StepIdentifier = { epoch, point, model::FinalizationStage::Prevote };
 			std::copy(pHashes, pHashes + numHashes, pMessage->HashesPtr());
 			messages.push_back(std::move(pMessage));
 		}
@@ -102,6 +103,7 @@ namespace catapult { namespace test {
 	}
 
 	std::vector<std::shared_ptr<model::FinalizationMessage>> CreatePrecommitMessages(
+			FinalizationEpoch epoch,
 			FinalizationPoint point,
 			Height height,
 			size_t numMessages,
@@ -110,7 +112,7 @@ namespace catapult { namespace test {
 		std::vector<std::shared_ptr<model::FinalizationMessage>> messages;
 		for (auto i = 0u; i < numMessages; ++i) {
 			auto pMessage = CreateMessage(height + Height(index), 1);
-			pMessage->StepIdentifier = { FinalizationEpoch(), point, model::FinalizationStage::Precommit };
+			pMessage->StepIdentifier = { epoch, point, model::FinalizationStage::Precommit };
 			*pMessage->HashesPtr() = pHashes[index];
 			messages.push_back(std::move(pMessage));
 		}

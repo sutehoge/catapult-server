@@ -182,8 +182,8 @@ namespace catapult { namespace test {
 			auto& accountState = accountStateCacheDelta.find(address).get();
 			accountState.SupplementalPublicKeys.voting().add({
 				keyPairDescriptors.back().VotingPublicKey,
-				FinalizationPoint(1),
-				FinalizationPoint(100)
+				FinalizationEpoch(1),
+				FinalizationEpoch(100)
 			});
 			accountState.Balances.credit(mosaicId, balance);
 		}

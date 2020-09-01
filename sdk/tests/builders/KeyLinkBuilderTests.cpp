@@ -138,8 +138,8 @@ namespace catapult { namespace builders {
 				{}
 
 			public:
-				FinalizationPoint StartEpoch;
-				FinalizationPoint EndEpoch;
+				FinalizationEpoch StartEpoch;
+				FinalizationEpoch EndEpoch;
 			};
 
 		public:
@@ -261,22 +261,22 @@ namespace catapult { namespace builders {
 	VOTING_KEY_LINK_BUILDER_TEST(CanSetStartEpoch) {
 		// Arrange:
 		auto expectedProperties = typename TTraits::TransactionProperties(model::LinkAction::Unlink);
-		expectedProperties.StartEpoch = FinalizationPoint(0x12345);
+		expectedProperties.StartEpoch = FinalizationEpoch(0x12345);
 
 		// Assert:
 		AssertCanBuildTransaction<TTraits>(expectedProperties, [](auto& builder) {
-			builder.setStartEpoch(FinalizationPoint(0x12345));
+			builder.setStartEpoch(FinalizationEpoch(0x12345));
 		});
 	}
 
 	VOTING_KEY_LINK_BUILDER_TEST(CanSetEndEpoch) {
 		// Arrange:
 		auto expectedProperties = typename TTraits::TransactionProperties(model::LinkAction::Unlink);
-		expectedProperties.EndEpoch = FinalizationPoint(0x54321);
+		expectedProperties.EndEpoch = FinalizationEpoch(0x54321);
 
 		// Assert:
 		AssertCanBuildTransaction<TTraits>(expectedProperties, [](auto& builder) {
-			builder.setEndEpoch(FinalizationPoint(0x54321));
+			builder.setEndEpoch(FinalizationEpoch(0x54321));
 		});
 	}
 

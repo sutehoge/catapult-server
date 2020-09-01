@@ -34,11 +34,11 @@ namespace catapult { namespace builders {
 		m_linkedPublicKey = linkedPublicKey;
 	}
 
-	void VotingKeyLinkBuilder::setStartEpoch(FinalizationPoint startEpoch) {
+	void VotingKeyLinkBuilder::setStartEpoch(FinalizationEpoch startEpoch) {
 		m_startEpoch = startEpoch;
 	}
 
-	void VotingKeyLinkBuilder::setEndEpoch(FinalizationPoint endEpoch) {
+	void VotingKeyLinkBuilder::setEndEpoch(FinalizationEpoch endEpoch) {
 		m_endEpoch = endEpoch;
 	}
 

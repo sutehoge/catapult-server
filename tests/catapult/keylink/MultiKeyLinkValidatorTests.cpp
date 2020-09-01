@@ -72,8 +72,8 @@ namespace catapult { namespace keylink {
 			EXPECT_EQ(expectedResult, result);
 		}
 
-		model::PinnedVotingKey CreatePinnedVotingKey(FinalizationPoint::ValueType startEpoch, FinalizationPoint::ValueType endEpoch) {
-			return { test::GenerateRandomByteArray<VotingKey>(), FinalizationPoint(startEpoch), FinalizationPoint(endEpoch) };
+		model::PinnedVotingKey CreatePinnedVotingKey(FinalizationEpoch::ValueType startEpoch, FinalizationEpoch::ValueType endEpoch) {
+			return { test::GenerateRandomByteArray<VotingKey>(), FinalizationEpoch(startEpoch), FinalizationEpoch(endEpoch) };
 		}
 
 		auto CreatePinnedVotingKeys(size_t count) {
@@ -106,7 +106,7 @@ namespace catapult { namespace keylink {
 		auto pinnedVotingKeys = CreatePinnedVotingKeys(2);
 		auto notificationPinnedVotingKey1 = CreatePinnedVotingKey(800, 900);
 		auto notificationPinnedVotingKey2 = CreatePinnedVotingKey(800, 900);
-		notificationPinnedVotingKey2.StartEpoch = pinnedVotingKeys[1].EndEpoch + FinalizationPoint(1);
+		notificationPinnedVotingKey2.StartEpoch = pinnedVotingKeys[1].EndEpoch + FinalizationEpoch(1);
 
 		// Act + Assert:
 		AssertValidation(validators::ValidationResult::Success, pinnedVotingKeys, notificationPinnedVotingKey1, model::LinkAction::Link);
@@ -151,7 +151,7 @@ namespace catapult { namespace keylink {
 		// Arrange: EndEpoch is off by one
 		auto pinnedVotingKeys = CreatePinnedVotingKeys(2);
 		auto notificationPinnedVotingKey = pinnedVotingKeys[0];
-		notificationPinnedVotingKey.EndEpoch = pinnedVotingKeys[0].EndEpoch + FinalizationPoint(1);
+		notificationPinnedVotingKey.EndEpoch = pinnedVotingKeys[0].EndEpoch + FinalizationEpoch(1);
 
 		// Act + Assert:
 		AssertValidation(

@@ -38,7 +38,7 @@ namespace catapult { namespace validators {
 			auto votingPublicKey = test::GenerateRandomByteArray<VotingKey>();
 			model::VotingKeyLinkNotification notification(
 					mainAccountPublicKey,
-					{ votingPublicKey, FinalizationPoint(startEpoch), FinalizationPoint(endEpoch) },
+					{ votingPublicKey, FinalizationEpoch(startEpoch), FinalizationEpoch(endEpoch) },
 					static_cast<model::LinkAction>(test::RandomByte()));
 
 			// Act:

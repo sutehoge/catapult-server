@@ -186,8 +186,8 @@ namespace catapult { namespace cache {
 
 	namespace {
 		void SetFinalizationPoints(model::PinnedVotingKey& pinnedPublicKey, uint64_t startEpoch, uint64_t endEpoch) {
-			pinnedPublicKey.StartEpoch = FinalizationPoint(startEpoch);
-			pinnedPublicKey.EndEpoch = FinalizationPoint(endEpoch);
+			pinnedPublicKey.StartEpoch = FinalizationEpoch(startEpoch);
+			pinnedPublicKey.EndEpoch = FinalizationEpoch(endEpoch);
 		}
 
 		template<typename TTraits>

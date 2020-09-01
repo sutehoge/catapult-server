@@ -29,17 +29,17 @@ namespace catapult { namespace model {
 	/// Pinned voting key.
 	struct PinnedVotingKey {
 	public:
-		static constexpr auto Size = catapult::VotingKey::Size + 2 * sizeof(FinalizationPoint);
+		static constexpr auto Size = catapult::VotingKey::Size + 2 * sizeof(FinalizationEpoch);
 
 	public:
 		/// Voting key.
 		catapult::VotingKey VotingKey;
 
-		/// Start finalization point.
-		FinalizationPoint StartEpoch;
+		/// Start finalization epoch.
+		FinalizationEpoch StartEpoch;
 
-		/// End finalization point.
-		FinalizationPoint EndEpoch;
+		/// End finalization epoch.
+		FinalizationEpoch EndEpoch;
 
 	public:
 		/// Returns \c true if this root voting key is equal to \a rhs.

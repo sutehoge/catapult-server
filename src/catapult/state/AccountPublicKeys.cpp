@@ -110,17 +110,17 @@ namespace catapult { namespace state {
 	}
 
 	template<typename TPinnedAccountPublicKey>
-	FinalizationPoint PUBLIC_KEYS_ACCESSOR_T::upperBound() const {
-		return m_pKeys ? m_pKeys->back().EndEpoch : FinalizationPoint();
+	FinalizationEpoch PUBLIC_KEYS_ACCESSOR_T::upperBound() const {
+		return m_pKeys ? m_pKeys->back().EndEpoch : FinalizationEpoch();
 	}
 
 	template<typename TPinnedAccountPublicKey>
-	std::pair<size_t, bool> PUBLIC_KEYS_ACCESSOR_T::contains(FinalizationPoint point) const {
+	std::pair<size_t, bool> PUBLIC_KEYS_ACCESSOR_T::contains(FinalizationEpoch epoch) const {
 		if (!m_pKeys)
 			return std::make_pair(std::numeric_limits<size_t>::max(), false);
 
-		auto iter = std::find_if(m_pKeys->cbegin(), m_pKeys->cend(), [point](const auto& key) {
-			return key.StartEpoch <= point && point <= key.EndEpoch;
+		auto iter = std::find_if(m_pKeys->cbegin(), m_pKeys->cend(), [epoch](const auto& key) {
+			return key.StartEpoch <= epoch && epoch <= key.EndEpoch;
 		});
 		return m_pKeys->cend() == iter
 				? std::make_pair(std::numeric_limits<size_t>::max(), false)

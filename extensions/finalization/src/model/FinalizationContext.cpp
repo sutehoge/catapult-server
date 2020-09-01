@@ -24,11 +24,8 @@
 namespace catapult { namespace model {
 
 	namespace {
-		VotingKey Find(const std::vector<PinnedVotingKey>& pinnedPublicKeys, FinalizationPoint point) {
-			auto iter = std::find_if(pinnedPublicKeys.cbegin(), pinnedPublicKeys.cend(), [point](const auto& pinnedPublicKey) {
-				return pinnedPublicKey.StartEpoch <= point && point <= pinnedPublicKey.EndEpoch;
-			});
-			return pinnedPublicKeys.cend() != iter ? iter->VotingKey : VotingKey();
+		VotingKey Find(const std::vector<PinnedVotingKey>& , FinalizationPoint ) {
+			return VotingKey();
 		}
 	}
 

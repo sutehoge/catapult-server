@@ -39,11 +39,11 @@ namespace catapult { namespace builders {
 		/// Sets the linked public key to \a linkedPublicKey.
 		void setLinkedPublicKey(const VotingKey& linkedPublicKey);
 
-		/// Sets the start point to \a startEpoch.
-		void setStartEpoch(FinalizationPoint startEpoch);
+		/// Sets the start epoch to \a startEpoch.
+		void setStartEpoch(FinalizationEpoch startEpoch);
 
-		/// Sets the end point to \a endEpoch.
-		void setEndEpoch(FinalizationPoint endEpoch);
+		/// Sets the end epoch to \a endEpoch.
+		void setEndEpoch(FinalizationEpoch endEpoch);
 
 		/// Sets the link action to \a linkAction.
 		void setLinkAction(model::LinkAction linkAction);
@@ -68,8 +68,8 @@ namespace catapult { namespace builders {
 
 	private:
 		VotingKey m_linkedPublicKey;
-		FinalizationPoint m_startEpoch;
-		FinalizationPoint m_endEpoch;
+		FinalizationEpoch m_startEpoch;
+		FinalizationEpoch m_endEpoch;
 		model::LinkAction m_linkAction;
 	};
 }}

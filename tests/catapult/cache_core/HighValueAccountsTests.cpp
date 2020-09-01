@@ -172,7 +172,7 @@ namespace catapult { namespace cache {
 		}
 
 		model::PinnedVotingKey GeneratePinnedVotingKey(uint64_t startEpoch, uint64_t endEpoch) {
-			return { test::GenerateRandomByteArray<VotingKey>(), FinalizationPoint(startEpoch), FinalizationPoint(endEpoch) };
+			return { test::GenerateRandomByteArray<VotingKey>(), FinalizationEpoch(startEpoch), FinalizationEpoch(endEpoch) };
 		}
 
 		void AddAccountsWithBalances(MemorySetType& set, const std::vector<Address>& addresses, const std::vector<Amount>& balances) {

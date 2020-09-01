@@ -63,8 +63,8 @@ namespace catapult { namespace keylink {
 			return Accessor::Get(accountStateCache.find(mainAccountPublicKey).get()).getAll();
 		}
 
-		model::PinnedVotingKey CreatePinnedVotingKey(FinalizationPoint::ValueType startEpoch, FinalizationPoint::ValueType endEpoch) {
-			return { test::GenerateRandomByteArray<VotingKey>(), FinalizationPoint(startEpoch), FinalizationPoint(endEpoch) };
+		model::PinnedVotingKey CreatePinnedVotingKey(FinalizationEpoch::ValueType startEpoch, FinalizationEpoch::ValueType endEpoch) {
+			return { test::GenerateRandomByteArray<VotingKey>(), FinalizationEpoch(startEpoch), FinalizationEpoch(endEpoch) };
 		}
 	}
 

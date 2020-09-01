@@ -27,63 +27,6 @@ namespace catapult { namespace model {
 
 #define TEST_CLASS StepIdentifierTests
 
-	// region finalization round operators
-
-	namespace {
-		std::vector<FinalizationRound> GenerateIncreasingFinalizationRoundValues() {
-			return {
-				{ FinalizationEpoch(7), FinalizationPoint(5) },
-				{ FinalizationEpoch(7), FinalizationPoint(10) },
-				{ FinalizationEpoch(7), FinalizationPoint(11) },
-				{ FinalizationEpoch(8), FinalizationPoint(11) }
-			};
-		}
-	}
-
-	DEFINE_EQUALITY_AND_COMPARISON_TESTS_WITH_PREFIX(TEST_CLASS, GenerateIncreasingFinalizationRoundValues(), RoundIdentifier_)
-
-	TEST(TEST_CLASS, FinalizationRoundCanOutput) {
-		// Arrange:
-		auto round = FinalizationRound{ FinalizationEpoch(7), FinalizationPoint(11) };
-
-		// Act:
-		auto str = test::ToString(round);
-
-		// Assert:
-		EXPECT_EQ("(7, 11)", str);
-	}
-
-	// endregion
-
-	// region finalization round size + alignment
-
-#define FINALIZATION_ROUND_FIELDS FIELD(Epoch) FIELD(Point)
-
-	TEST(TEST_CLASS, FinalizationRoundHasExpectedSize) {
-		// Arrange:
-		auto expectedSize = 0u;
-
-#define FIELD(X) expectedSize += SizeOf32<decltype(FinalizationRound::X)>();
-		FINALIZATION_ROUND_FIELDS
-#undef FIELD
-
-		// Assert:
-		EXPECT_EQ(expectedSize, sizeof(FinalizationRound));
-		EXPECT_EQ(16u, sizeof(FinalizationRound));
-	}
-
-	TEST(TEST_CLASS, FinalizationRoundHasProperAlignment) {
-#define FIELD(X) EXPECT_ALIGNED(FinalizationRound, X);
-		FINALIZATION_ROUND_FIELDS
-#undef FIELD
-
-		EXPECT_EQ(0u, sizeof(FinalizationRound) % 8);
-	}
-
-#undef FINALIZATION_ROUND_FIELDS
-
-	// endregion
-
 	// region step identifier operators
 
 	namespace {
@@ -100,9 +43,9 @@ namespace catapult { namespace model {
 		}
 	}
 
-	DEFINE_EQUALITY_AND_COMPARISON_TESTS_WITH_PREFIX(TEST_CLASS, GenerateIncreasingStepIdentifierValues(), StepIdentifier_)
+	DEFINE_EQUALITY_AND_COMPARISON_TESTS(TEST_CLASS, GenerateIncreasingStepIdentifierValues())
 
-	TEST(TEST_CLASS, StepIdentifierCanOutput) {
+	TEST(TEST_CLASS, StepIdentifier_CanOutput) {
 		// Arrange:
 		auto stepIdentifier = StepIdentifier{ FinalizationEpoch(7), FinalizationPoint(11), static_cast<FinalizationStage>(5) };
 

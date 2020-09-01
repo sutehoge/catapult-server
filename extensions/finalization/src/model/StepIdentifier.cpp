@@ -23,39 +23,6 @@
 
 namespace catapult { namespace model {
 
-	// region finalization round
-
-	bool FinalizationRound::operator==(const FinalizationRound& rhs) const {
-		return Epoch == rhs.Epoch && Point == rhs.Point;
-	}
-
-	bool FinalizationRound::operator!=(const FinalizationRound& rhs) const {
-		return !(*this == rhs);
-	}
-
-	bool FinalizationRound::operator<(const FinalizationRound& rhs) const {
-		return Epoch != rhs.Epoch ? Epoch < rhs.Epoch : Point < rhs.Point;
-	}
-
-	bool FinalizationRound::operator<=(const FinalizationRound& rhs) const {
-		return *this < rhs || *this == rhs;
-	}
-
-	bool FinalizationRound::operator>(const FinalizationRound& rhs) const {
-		return !(*this <= rhs);
-	}
-
-	bool FinalizationRound::operator>=(const FinalizationRound& rhs) const {
-		return !(*this < rhs);
-	}
-
-	std::ostream& operator<<(std::ostream& out, const FinalizationRound& round) {
-		out << "(" << round.Epoch << ", " << round.Point << ")";
-		return out;
-	}
-
-	// endregion
-
 	// region step identifier
 
 	bool StepIdentifier::operator==(const StepIdentifier& rhs) const {

@@ -185,9 +185,9 @@ namespace catapult { namespace cache {
 	// region roundtrip tests
 
 	namespace {
-		void SetFinalizationPoints(model::PinnedVotingKey& pinnedPublicKey, uint64_t startPoint, uint64_t endPoint) {
-			pinnedPublicKey.StartPoint = FinalizationPoint(startPoint);
-			pinnedPublicKey.EndPoint = FinalizationPoint(endPoint);
+		void SetFinalizationPoints(model::PinnedVotingKey& pinnedPublicKey, uint64_t startEpoch, uint64_t endEpoch) {
+			pinnedPublicKey.StartEpoch = FinalizationPoint(startEpoch);
+			pinnedPublicKey.EndEpoch = FinalizationPoint(endEpoch);
 		}
 
 		template<typename TTraits>

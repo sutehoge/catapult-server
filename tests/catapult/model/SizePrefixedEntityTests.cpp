@@ -65,20 +65,20 @@ namespace catapult { namespace model {
 			uint32_t Custom;
 
 		public:
-			auto StartPointer() const {
+			auto StartEpocher() const {
 				return ToBytePointer();
 			}
 
-			auto EndPointer() const {
+			auto EndEpocher() const {
 				return PayloadStart(*this);
 			}
 
 		public:
-			auto StartPointer() {
+			auto StartEpocher() {
 				return ToBytePointer();
 			}
 
-			auto EndPointer() {
+			auto EndEpocher() {
 				return PayloadStart(*this);
 			}
 
@@ -91,22 +91,22 @@ namespace catapult { namespace model {
 #pragma pack(pop)
 
 		struct NonConstTraits {
-			static auto ToStartPointer(CustomSizePrefixedEntity& entity) {
-				return entity.StartPointer();
+			static auto ToStartEpocher(CustomSizePrefixedEntity& entity) {
+				return entity.StartEpocher();
 			}
 
-			static auto ToEndPointer(CustomSizePrefixedEntity& entity) {
-				return entity.EndPointer();
+			static auto ToEndEpocher(CustomSizePrefixedEntity& entity) {
+				return entity.EndEpocher();
 			}
 		};
 
 		struct ConstTraits {
-			static auto ToStartPointer(const CustomSizePrefixedEntity& entity) {
-				return entity.StartPointer();
+			static auto ToStartEpocher(const CustomSizePrefixedEntity& entity) {
+				return entity.StartEpocher();
 			}
 
-			static auto ToEndPointer(const CustomSizePrefixedEntity& entity) {
-				return entity.EndPointer();
+			static auto ToEndEpocher(const CustomSizePrefixedEntity& entity) {
+				return entity.EndEpocher();
 			}
 		};
 	}
@@ -122,7 +122,7 @@ namespace catapult { namespace model {
 		CustomSizePrefixedEntity entity;
 
 		// Act:
-		auto pEntityStart = test::AsVoidPointer(TTraits::ToStartPointer(entity));
+		auto pEntityStart = test::AsVoidPointer(TTraits::ToStartEpocher(entity));
 
 		// Assert:
 		EXPECT_EQ(&entity, pEntityStart);
@@ -134,7 +134,7 @@ namespace catapult { namespace model {
 		entity.Size = sizeof(CustomSizePrefixedEntity);
 
 		// Act:
-		auto pEntityEnd = test::AsVoidPointer(TTraits::ToEndPointer(entity));
+		auto pEntityEnd = test::AsVoidPointer(TTraits::ToEndEpocher(entity));
 
 		// Assert:
 		EXPECT_EQ(&entity + 1, pEntityEnd);
@@ -148,7 +148,7 @@ namespace catapult { namespace model {
 			entity.Size = size;
 
 			// Act:
-			auto pEntityEnd = test::AsVoidPointer(TTraits::ToEndPointer(entity));
+			auto pEntityEnd = test::AsVoidPointer(TTraits::ToEndEpocher(entity));
 
 			// Assert:
 			EXPECT_FALSE(!!pEntityEnd);

@@ -418,7 +418,7 @@ namespace catapult { namespace state {
 		EXPECT_EQ(FP(0), accessor.upperBound());
 	}
 
-	PUBLIC_KEYS_ACCESSOR_TEST(UpperBoundReturnsLargestEndPointWhenKeysAreSet) {
+	PUBLIC_KEYS_ACCESSOR_TEST(UpperBoundReturnsLargestEndEpochWhenKeysAreSet) {
 		// Arrange:
 		PublicKeysAccessor accessor;
 		accessor.add({ { { 0x11 } }, FP(1), FP(50) });

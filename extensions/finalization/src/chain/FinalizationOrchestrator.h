@@ -63,6 +63,9 @@ namespace catapult { namespace chain {
 		VotingStatus votingStatus() const;
 
 	public:
+		/// Sets the \a epoch.
+		void setEpoch(FinalizationEpoch epoch);
+
 		/// Checks progress given the current \a time.
 		void poll(Timestamp time);
 

@@ -253,6 +253,84 @@ namespace catapult { namespace chain {
 
 	// endregion
 
+	// region setEpoch
+
+	namespace {
+		template<typename TAction>
+		void RunSetEpochTest(TAction action) {
+			// Arrange:
+			TestContext context({ test::CreateFinalizationRound(11, 4), true, true });
+
+			// Sanity:
+			EXPECT_EQ(test::CreateFinalizationRound(11, 4), context.orchestrator().votingStatus().Round);
+			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrevote);
+			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrecommit);
+
+			// Act + Assert:
+			action(context);
+		}
+	}
+
+	TEST(TEST_CLASS, SetEpochCannotDecreaseCurrentEpoch) {
+		// Arrange:
+		RunSetEpochTest([](auto& context) {
+			// Act + Assert:
+			EXPECT_THROW(context.orchestrator().setEpoch(FinalizationEpoch(10)), catapult_invalid_argument);
+		});
+	}
+
+
+	TEST(TEST_CLASS, SetEpochHasNoEffectWhenCurrentEpochIsEqual) {
+		// Arrange:
+		RunSetEpochTest([](auto& context) {
+			// Act:
+			context.orchestrator().setEpoch(FinalizationEpoch(11));
+
+			// Assert:
+			EXPECT_EQ(test::CreateFinalizationRound(11, 4), context.orchestrator().votingStatus().Round);
+			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrevote);
+			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrecommit);
+		});
+	}
+
+	TEST(TEST_CLASS, SetEpochCanIncreaseCurrentEpoch) {
+		// Arrange:
+		RunSetEpochTest([](auto& context) {
+			// Act:
+			context.orchestrator().setEpoch(FinalizationEpoch(15));
+
+			// Assert:
+			EXPECT_EQ(test::CreateFinalizationRound(15, 1), context.orchestrator().votingStatus().Round);
+			EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
+			EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		});
+	}
+
+	TEST(TEST_CLASS, PollCreatesNewAdvancerAfterSetEpochAdvancesEpoch) {
+		// Arrange:
+		TestContext context({ test::CreateFinalizationRound(3, 4), true, true });
+		context.orchestrator().poll(Timestamp(100));
+		context.orchestrator().setEpoch(FinalizationEpoch(11));
+
+		// Act:
+		context.orchestrator().poll(Timestamp(200));
+
+		// Assert:
+		EXPECT_EQ(test::CreateFinalizationRound(11, 1), context.orchestrator().votingStatus().Round);
+		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
+		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+
+		EXPECT_EQ(std::vector<MessageType>(), context.messageFactory().messageTypes());
+		EXPECT_EQ(0u, context.messages().size());
+
+		ASSERT_EQ(2u, context.stageAdvancers().size());
+		EXPECT_EQ(test::CreateFinalizationRound(11, 1), context.stageAdvancers().back()->round());
+		EXPECT_EQ(Timestamp(200), context.stageAdvancers().back()->time());
+		EXPECT_EQ(ToTimestamps({ 200, 200 }), context.stageAdvancers().back()->times());
+	}
+
+	// endregion
+
 	// region poll - start round
 
 	TEST(TEST_CLASS, PollCreatesStageAdvancerForCurrentRoundWhenNoAdvancerIsPresent) {

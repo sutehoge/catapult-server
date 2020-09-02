@@ -26,6 +26,13 @@
 
 namespace catapult { namespace chain {
 
+	namespace {
+		void ClearFlags(VotingStatus& votingStatus) {
+			votingStatus.HasSentPrevote = false;
+			votingStatus.HasSentPrecommit = false;
+		}
+	}
+
 	FinalizationOrchestrator::FinalizationOrchestrator(
 			const VotingStatus& votingStatus,
 			const StageAdvancerFactory& stageAdvancerFactory,
@@ -43,6 +50,18 @@ namespace catapult { namespace chain {
 
 	VotingStatus FinalizationOrchestrator::votingStatus() const {
 		return m_votingStatus;
+	}
+
+	void FinalizationOrchestrator::setEpoch(FinalizationEpoch epoch) {
+		if (epoch < m_votingStatus.Round.Epoch)
+			CATAPULT_THROW_INVALID_ARGUMENT("cannot decrease epoch");
+
+		if (epoch == m_votingStatus.Round.Epoch)
+			return;
+
+		m_votingStatus.Round = { epoch, FinalizationPoint(1) };
+		ClearFlags(m_votingStatus);
+		m_pStageAdvancer.reset();
 	}
 
 	void FinalizationOrchestrator::poll(Timestamp time) {
@@ -68,8 +87,7 @@ namespace catapult { namespace chain {
 	}
 
 	void FinalizationOrchestrator::startRound(Timestamp time) {
-		m_votingStatus.HasSentPrevote = false;
-		m_votingStatus.HasSentPrecommit = false;
+		ClearFlags(m_votingStatus);
 		m_pStageAdvancer = m_stageAdvancerFactory(m_votingStatus.Round, time);
 	}
 

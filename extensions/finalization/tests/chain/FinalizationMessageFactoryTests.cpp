@@ -37,7 +37,7 @@ namespace catapult { namespace chain {
 	namespace {
 		class TestContext {
 		public:
-			static constexpr auto Ots_Key_Dilution = 13u;
+			static constexpr auto Ots_Key_Dilution = 130u;
 
 		public:
 			TestContext(FinalizationEpoch epoch, FinalizationPoint point, Height height)
@@ -80,7 +80,7 @@ namespace catapult { namespace chain {
 						{ FinalizationEpoch(), point, model::FinalizationStage::Prevote },
 						Ots_Key_Dilution);
 				auto endKeyIdentifier = model::StepIdentifierToOtsKeyIdentifier(
-						{ FinalizationEpoch(), point + FinalizationPoint(20), model::FinalizationStage::Precommit },
+						{ FinalizationEpoch(20), point + FinalizationPoint(20), model::FinalizationStage::Precommit },
 						Ots_Key_Dilution);
 				return crypto::OtsTree::Create(
 						test::GenerateKeyPair(),

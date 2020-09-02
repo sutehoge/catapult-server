@@ -43,7 +43,7 @@ namespace catapult { namespace chain {
 
 		class TestContext {
 		private:
-			static constexpr auto Ots_Key_Dilution = 7u;
+			static constexpr auto Ots_Key_Dilution = 70u;
 
 		public:
 			TestContext(uint32_t size, uint32_t threshold) : TestContext(size, threshold, TestContextOptions())

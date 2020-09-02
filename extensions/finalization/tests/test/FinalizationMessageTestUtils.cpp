@@ -138,7 +138,7 @@ namespace catapult { namespace test {
 
 	void SignMessage(model::FinalizationMessage& message, const crypto::KeyPair& votingKeyPair, uint64_t dilution) {
 		auto storage = mocks::MockSeekableMemoryStream();
-		auto otsOptions = crypto::OtsOptions{ dilution, { 0, 2 }, { 15, 1 } };
+		auto otsOptions = crypto::OtsOptions{ dilution, { 1, 0 }, { 521, 1 } };
 		auto otsTree = crypto::OtsTree::Create(CopyKeyPair(votingKeyPair), storage, otsOptions);
 
 		auto keyIdentifier = model::StepIdentifierToOtsKeyIdentifier(message.StepIdentifier, otsTree.options().Dilution);

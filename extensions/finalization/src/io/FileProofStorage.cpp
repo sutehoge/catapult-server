@@ -76,9 +76,13 @@ namespace catapult { namespace io {
 	namespace {
 		static constexpr auto Proof_File_Extension = ".proof";
 
-		auto OpenProofFile(const std::string& baseDirectory, FinalizationEpoch epoch, OpenMode mode = OpenMode::Read_Only) {
-			auto storageDir = config::CatapultStorageDirectoryPreparer::Prepare(baseDirectory, epoch);
-			return std::make_unique<RawFile>(storageDir.storageFile(Proof_File_Extension), mode);
+		auto OpenProofFile(const std::string& baseDirectory, const model::FinalizationRound& round, OpenMode mode = OpenMode::Read_Only) {
+			std::ostringstream extensionBuffer;
+			extensionBuffer << "_" << round.Point;
+			extensionBuffer << Proof_File_Extension;
+
+			auto storageDir = config::CatapultStorageDirectoryPreparer::Prepare(baseDirectory, round.Epoch);
+			return std::make_unique<RawFile>(storageDir.storageFile(extensionBuffer.str()), mode);
 		}
 	}
 
@@ -94,18 +98,19 @@ namespace catapult { namespace io {
 		}
 	}
 
-	std::shared_ptr<const model::FinalizationProof> FileProofStorage::loadProof(FinalizationEpoch epoch) const {
-		if (FinalizationEpoch() == epoch)
+	std::shared_ptr<const model::FinalizationProof> FileProofStorage::loadProof(const model::FinalizationRound& round) const {
+		if (FinalizationEpoch() == round.Epoch)
 			CATAPULT_THROW_INVALID_ARGUMENT("loadProof called with epoch 0");
 
+		// TODO: most likely wrong
 		auto currentEpoch = statistics().Round.Epoch;
-		if (currentEpoch < epoch) {
+		if (currentEpoch < round.Epoch) {
 			std::ostringstream out;
-			out << "cannot load proof with epoch " << epoch << " when storage epoch is " << currentEpoch;
+			out << "cannot load proof with epoch " << round.Epoch << " when storage epoch is " << currentEpoch;
 			CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
 		}
 
-		auto pProofFile = OpenProofFile(m_dataDirectory, epoch);
+		auto pProofFile = OpenProofFile(m_dataDirectory, round);
 		return ReadFinalizationProof(*pProofFile);
 	}
 
@@ -124,13 +129,13 @@ namespace catapult { namespace io {
 		if (FinalizationEpoch() == epoch)
 			return nullptr;
 
-		auto pProofFile = OpenProofFile(m_dataDirectory, epoch);
+		auto pProofFile = OpenProofFile(m_dataDirectory, { epoch, FinalizationPoint(1) });
 		return ReadFinalizationProof(*pProofFile);
 	}
 
 	void FileProofStorage::saveProof(const model::FinalizationProof& proof) {
 		auto currentStatistics = statistics();
-		if (currentStatistics.Round > proof.Round || proof.Round.Epoch > currentStatistics.Round.Epoch + FinalizationEpoch(1)) {
+		if (currentStatistics.Round > proof.Round) {
 			std::ostringstream out;
 			out << "cannot save proof with round " << proof.Round << " when storage round is " << currentStatistics.Round;
 			CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
@@ -143,7 +148,7 @@ namespace catapult { namespace io {
 		}
 
 		{
-			auto pProofFile = OpenProofFile(m_dataDirectory, proof.Round.Epoch, OpenMode::Read_Write);
+			auto pProofFile = OpenProofFile(m_dataDirectory, proof.Round, OpenMode::Read_Write);
 			BufferedOutputFileStream stream(std::move(*pProofFile));
 			stream.write({ reinterpret_cast<const uint8_t*>(&proof), proof.Size });
 			stream.flush();

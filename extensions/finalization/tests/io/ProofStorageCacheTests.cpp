@@ -39,8 +39,8 @@ namespace catapult { namespace io {
 				return m_cache.view().statistics();
 			}
 
-			std::shared_ptr<const model::FinalizationProof> loadProof(FinalizationEpoch epoch) const override {
-				return m_cache.view().loadProof(epoch);
+			std::shared_ptr<const model::FinalizationProof> loadProof(const model::FinalizationRound& round) const override {
+				return m_cache.view().loadProof(round);
 			}
 
 			std::shared_ptr<const model::FinalizationProof> loadProof(Height height) const override {

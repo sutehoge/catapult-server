@@ -81,11 +81,11 @@ namespace catapult { namespace mocks {
 			return { { m_epoch, m_point }, m_height, m_hash };
 		}
 
-		std::shared_ptr<const model::FinalizationProof> loadProof(FinalizationEpoch epoch) const override {
-			if (FinalizationEpoch() == epoch || epoch > m_epoch)
+		std::shared_ptr<const model::FinalizationProof> loadProof(const model::FinalizationRound& round) const override {
+			if (FinalizationEpoch() == round.Epoch || round.Epoch > m_epoch)
 				CATAPULT_THROW_INVALID_ARGUMENT("epoch must be nonzero and no greater than finalizationPoint");
 
-			return m_epoch == epoch ? m_pProof : nullptr;
+			return m_epoch == round.Epoch ? m_pProof : nullptr;
 		}
 
 		std::shared_ptr<const model::FinalizationProof> loadProof(Height height) const override {

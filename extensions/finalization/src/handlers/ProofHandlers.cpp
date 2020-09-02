@@ -54,7 +54,7 @@ namespace catapult { namespace handlers {
 			static auto LoadProof(const io::ProofStorageView& proofStorageView, const RequestType& request) {
 				return FinalizationEpoch() == request.Epoch || request.Epoch > proofStorageView.statistics().Round.Epoch
 						? nullptr
-						: proofStorageView.loadProof(request.Epoch);
+						: proofStorageView.loadProof({ request.Epoch, FinalizationPoint(1) }); // TODO: both should be in request
 			}
 		};
 

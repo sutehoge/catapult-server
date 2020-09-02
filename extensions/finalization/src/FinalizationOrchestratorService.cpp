@@ -24,10 +24,12 @@
 #include "VotingStatusFile.h"
 #include "finalization/src/chain/MultiRoundMessageAggregator.h"
 #include "finalization/src/io/ProofStorageCache.h"
+#include "finalization/src/model/VotingSet.h"
 #include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/crypto_voting/OtsTree.h"
 #include "catapult/extensions/ServiceLocator.h"
 #include "catapult/extensions/ServiceState.h"
+#include "catapult/io/BlockStorageCache.h"
 #include "catapult/io/FileStream.h"
 
 namespace catapult { namespace finalization {
@@ -39,6 +41,9 @@ namespace catapult { namespace finalization {
 
 		class BootstrapperFacade {
 		private:
+			enum class EpochStatus { Default, Blocked, Advance };
+
+		private:
 			static constexpr auto LoadOtsTree = crypto::OtsTree::FromStream;
 
 		public:
@@ -46,9 +51,11 @@ namespace catapult { namespace finalization {
 					const FinalizationConfiguration& config,
 					const extensions::ServiceLocator& locator,
 					extensions::ServiceState& state)
-					: m_messageAggregator(GetMultiRoundMessageAggregator(locator))
+					: m_votingSetGrouping(config.VotingSetGrouping)
+					, m_messageAggregator(GetMultiRoundMessageAggregator(locator))
 					, m_hooks(GetFinalizationServerHooks(locator))
 					, m_proofStorage(GetProofStorageCache(locator))
+					, m_blockStorage(state.storage())
 					, m_otsStream(io::RawFile(QualifyFilename(state, "voting_ots_tree.dat"), io::OpenMode::Read_Append))
 					, m_votingStatusFile(QualifyFilename(state, "voting_status.dat"))
 					, m_orchestrator(
@@ -66,6 +73,18 @@ namespace catapult { namespace finalization {
 		public:
 			void poll(Timestamp time) {
 				auto orchestratorStartRound = m_orchestrator.votingStatus().Round;
+
+				auto epochStatus = calculateEpochStatus(orchestratorStartRound.Epoch);
+				if (EpochStatus::Blocked == epochStatus)
+					return;
+
+				if (EpochStatus::Advance == epochStatus) {
+					m_orchestrator.setEpoch(orchestratorStartRound.Epoch + FinalizationEpoch(1));
+					orchestratorStartRound = m_orchestrator.votingStatus().Round;
+
+					CATAPULT_LOG(debug) << "advancing to next epoch " << orchestratorStartRound;
+				}
+
 				if (orchestratorStartRound > m_messageAggregator.view().maxFinalizationRound())
 					m_messageAggregator.modifier().setMaxFinalizationRound(orchestratorStartRound);
 
@@ -75,14 +94,46 @@ namespace catapult { namespace finalization {
 			}
 
 		private:
+			EpochStatus calculateEpochStatus(FinalizationEpoch epoch) const {
+				auto finalizationStatistics = m_proofStorage.view().statistics();
+				auto votingSetEndHeight = model::CalculateVotingSetEndHeight(epoch, m_votingSetGrouping);
+
+				if (finalizationStatistics.Height != votingSetEndHeight)
+					return EpochStatus::Default;
+
+				auto blockStorageView = m_blockStorage.view();
+				auto localChainHeight = blockStorageView.chainHeight();
+				if (localChainHeight < finalizationStatistics.Height) {
+					CATAPULT_LOG(warning)
+							<< "waiting for sync before transitioning from epoch " << epoch
+							<< " (height " << localChainHeight
+							<< " < finalized height " << finalizationStatistics.Height << ")";
+					return EpochStatus::Blocked;
+				}
+
+				auto localBlockHash = *blockStorageView.loadHashesFrom(finalizationStatistics.Height, 1).cbegin();
+				if (localBlockHash != finalizationStatistics.Hash) {
+					CATAPULT_LOG(warning)
+							<< "waiting for sync before transitioning from epoch " << epoch
+							<< " (hash " << localBlockHash
+							<< " != finalized hash " << finalizationStatistics.Hash << ")";
+					return EpochStatus::Blocked;
+				}
+
+				return EpochStatus::Advance;
+			}
+
+		private:
 			static std::string QualifyFilename(const extensions::ServiceState& state, const std::string& name) {
 				return config::CatapultDataDirectory(state.config().User.DataDirectory).rootDir().file(name);
 			}
 
 		private:
+			uint64_t m_votingSetGrouping;
 			chain::MultiRoundMessageAggregator& m_messageAggregator;
 			FinalizationServerHooks& m_hooks;
 			io::ProofStorageCache& m_proofStorage;
+			io::BlockStorageCache& m_blockStorage;
 
 			io::FileStream m_otsStream;
 			VotingStatusFile m_votingStatusFile;

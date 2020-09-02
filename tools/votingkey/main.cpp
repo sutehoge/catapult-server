@@ -98,7 +98,7 @@ namespace catapult { namespace tools { namespace votingkey {
 						m_dilution);
 				options.EndKeyIdentifier = ToOtsKeyIdentifier(
 						FinalizationEpoch(m_endFinalizationEpoch),
-						FinalizationPoint(Dummy_Max_Points_Per_Epoch),
+						FinalizationPoint(Temp_Max_Points_Per_Epoch),
 						1,
 						m_dilution);
 

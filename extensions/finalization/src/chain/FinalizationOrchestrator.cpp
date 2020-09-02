@@ -31,7 +31,7 @@ namespace catapult { namespace chain {
 			const StageAdvancerFactory& stageAdvancerFactory,
 			const MessageSink& messageSink,
 			std::unique_ptr<FinalizationMessageFactory>&& pMessageFactory)
-			: m_pointRaw(votingStatus.Point.unwrap())
+			: m_pointRaw(votingStatus.Round.Point.unwrap()) // TODO: use epoch here too
 			, m_stageAdvancerFactory(stageAdvancerFactory)
 			, m_messageSink(messageSink)
 			, m_pMessageFactory(std::move(pMessageFactory))

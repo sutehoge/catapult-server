@@ -148,7 +148,7 @@ namespace catapult { namespace chain {
 
 		class TestContext {
 		public:
-			explicit TestContext(FinalizationPoint point) : TestContext({ point, false, false })
+			explicit TestContext(FinalizationPoint point) : TestContext({ { FinalizationEpoch(), point }, false, false })
 			{}
 
 			explicit TestContext(const VotingStatus& votingStatus)
@@ -457,7 +457,7 @@ namespace catapult { namespace chain {
 
 	TEST(TEST_CLASS, PollCanProgressThroughEntireRoundInOneCall_PreviouslySentPrevote) {
 		// Arrange:
-		TestContext context({ FinalizationPoint(3), true, false });
+		TestContext context({ test::CreateFinalizationRound(0, 3), true, false });
 
 		auto hash = test::GenerateRandomByteArray<Hash256>();
 		context.createCompletedStageAdvancer({ Height(123), hash });
@@ -482,7 +482,7 @@ namespace catapult { namespace chain {
 
 	TEST(TEST_CLASS, PollCanProgressThroughEntireRoundInOneCall_PreviouslySentPrecommit) {
 		// Arrange:
-		TestContext context({ FinalizationPoint(3), true, true });
+		TestContext context({ test::CreateFinalizationRound(0, 3), true, true });
 
 		auto hash = test::GenerateRandomByteArray<Hash256>();
 		context.createCompletedStageAdvancer({ Height(123), hash });

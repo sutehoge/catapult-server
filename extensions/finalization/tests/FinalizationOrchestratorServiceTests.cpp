@@ -175,7 +175,7 @@ namespace catapult { namespace finalization {
 
 			static void SeedVotingStatus(const config::UserConfiguration& userConfig, FinalizationPoint point) {
 				auto votingStatusFilename = config::CatapultDataDirectory(userConfig.DataDirectory).rootDir().file("voting_status.dat");
-				VotingStatusFile(votingStatusFilename).save({ point, false, false });
+				VotingStatusFile(votingStatusFilename).save({ { FinalizationEpoch(), point }, false, false });
 			}
 
 		private:
@@ -264,7 +264,7 @@ namespace catapult { namespace finalization {
 
 			// - voting status wasn't changed
 			auto votingStatus = context.votingStatus();
-			EXPECT_EQ(FinalizationPoint(8), votingStatus.Point);
+			EXPECT_EQ(test::CreateFinalizationRound(0, 8), votingStatus.Round);
 			EXPECT_FALSE(votingStatus.HasSentPrevote);
 			EXPECT_FALSE(votingStatus.HasSentPrecommit);
 		});
@@ -309,7 +309,7 @@ namespace catapult { namespace finalization {
 
 				// - voting status was changed
 				auto votingStatus = context.votingStatus();
-				EXPECT_EQ(FinalizationPoint(9), votingStatus.Point); // TODO: should be round ?
+				EXPECT_EQ(test::CreateFinalizationRound(0, 9), votingStatus.Round);
 				EXPECT_FALSE(votingStatus.HasSentPrevote);
 				EXPECT_FALSE(votingStatus.HasSentPrecommit);
 			});

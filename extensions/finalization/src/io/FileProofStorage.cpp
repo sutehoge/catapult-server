@@ -130,7 +130,7 @@ namespace catapult { namespace io {
 
 	void FileProofStorage::saveProof(const model::FinalizationProof& proof) {
 		auto currentStatistics = statistics();
-		if (currentStatistics.Round > proof.Round) {
+		if (currentStatistics.Round > proof.Round || proof.Round.Epoch > currentStatistics.Round.Epoch + FinalizationEpoch(1)) {
 			std::ostringstream out;
 			out << "cannot save proof with round " << proof.Round << " when storage round is " << currentStatistics.Round;
 			CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());

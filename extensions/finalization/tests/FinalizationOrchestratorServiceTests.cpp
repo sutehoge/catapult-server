@@ -291,9 +291,9 @@ namespace catapult { namespace finalization {
 				// - subscriber was called
 				const auto& subscriberParams = subscriber.finalizedBlockParams().params();
 				ASSERT_EQ(1u, subscriberParams.size());
+				EXPECT_EQ(test::CreateFinalizationRound(0, 8), subscriberParams[0].Round);
 				EXPECT_EQ(Height(246), subscriberParams[0].Height);
 				EXPECT_EQ(expectedHash, subscriberParams[0].Hash);
-				EXPECT_EQ(FinalizationPoint(8), subscriberParams[0].Point); // TODO: should be round ?
 
 				// - storage was called (proof step identifier comes from test::CreateMessage)
 				const auto& savedProofDescriptors = storage.savedProofDescriptors();

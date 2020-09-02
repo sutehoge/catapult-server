@@ -104,9 +104,9 @@ namespace catapult { namespace chain {
 			auto pProof = CreateFinalizationProof(ToFinalizationStatistics(bestPrecommitDescriptor), bestPrecommitDescriptor.Proof);
 			proofStorage.modifier().saveProof(*pProof);
 			subscriber.notifyFinalizedBlock(
+					bestPrecommitDescriptor.Round,
 					bestPrecommitDescriptor.Target.Height,
-					bestPrecommitDescriptor.Target.Hash,
-					bestPrecommitDescriptor.Round.Point); // TODO: epoch
+					bestPrecommitDescriptor.Target.Hash);
 
 			// TODO: prune messages here
 			// messageAggregator.modifier().prune();

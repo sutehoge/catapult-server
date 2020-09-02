@@ -663,9 +663,9 @@ namespace catapult { namespace chain {
 		// - subscriber was called
 		const auto& subscriberParams = context.subscriber().finalizedBlockParams().params();
 		ASSERT_EQ(1u, subscriberParams.size());
+		EXPECT_EQ(test::CreateFinalizationRound(0, 10), subscriberParams[0].Round);
 		EXPECT_EQ(Height(246), subscriberParams[0].Height);
 		EXPECT_EQ(hashes[3], subscriberParams[0].Hash);
-		EXPECT_EQ(FinalizationPoint(10), subscriberParams[0].Point);
 
 		// - storage was called (proof step identifier comes from test::CreateMessage)
 		const auto& savedProofDescriptors = context.proofStorage().savedProofDescriptors();
@@ -705,9 +705,9 @@ namespace catapult { namespace chain {
 		// - subscriber was called
 		const auto& subscriberParams = context.subscriber().finalizedBlockParams().params();
 		ASSERT_EQ(1u, subscriberParams.size());
+		EXPECT_EQ(test::CreateFinalizationRound(0, 8), subscriberParams[0].Round);
 		EXPECT_EQ(Height(246), subscriberParams[0].Height);
 		EXPECT_EQ(hashes[1], subscriberParams[0].Hash);
-		EXPECT_EQ(FinalizationPoint(8), subscriberParams[0].Point);
 
 		// - storage was called (proof step identifier comes from test::CreateMessage)
 		const auto& savedProofDescriptors = context.proofStorage().savedProofDescriptors();

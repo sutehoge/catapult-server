@@ -232,6 +232,12 @@ namespace catapult { namespace chain {
 			return timestamps;
 		}
 
+		void AssertVotingStatus(const VotingStatus& expected, const VotingStatus& actual) {
+			EXPECT_EQ(expected.Round, actual.Round);
+			EXPECT_EQ(expected.HasSentPrevote, actual.HasSentPrevote);
+			EXPECT_EQ(expected.HasSentPrecommit, actual.HasSentPrecommit);
+		}
+
 		// endregion
 	}
 
@@ -242,9 +248,7 @@ namespace catapult { namespace chain {
 		TestContext context(test::CreateFinalizationRound(3, 4));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(3, 4), context.orchestrator().votingStatus().Round);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(3, 4), false, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>(), context.messageFactory().messageTypes());
 		EXPECT_EQ(0u, context.messages().size());
@@ -262,9 +266,7 @@ namespace catapult { namespace chain {
 			TestContext context({ test::CreateFinalizationRound(11, 4), true, true });
 
 			// Sanity:
-			EXPECT_EQ(test::CreateFinalizationRound(11, 4), context.orchestrator().votingStatus().Round);
-			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrevote);
-			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrecommit);
+			AssertVotingStatus({ test::CreateFinalizationRound(11, 4), true, true }, context.orchestrator().votingStatus());
 
 			// Act + Assert:
 			action(context);
@@ -286,9 +288,7 @@ namespace catapult { namespace chain {
 			context.orchestrator().setEpoch(FinalizationEpoch(11));
 
 			// Assert:
-			EXPECT_EQ(test::CreateFinalizationRound(11, 4), context.orchestrator().votingStatus().Round);
-			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrevote);
-			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrecommit);
+			AssertVotingStatus({ test::CreateFinalizationRound(11, 4), true, true }, context.orchestrator().votingStatus());
 		});
 	}
 
@@ -299,9 +299,7 @@ namespace catapult { namespace chain {
 			context.orchestrator().setEpoch(FinalizationEpoch(15));
 
 			// Assert:
-			EXPECT_EQ(test::CreateFinalizationRound(15, 1), context.orchestrator().votingStatus().Round);
-			EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-			EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+			AssertVotingStatus({ test::CreateFinalizationRound(15, 1), false, false }, context.orchestrator().votingStatus());
 		});
 	}
 
@@ -315,9 +313,7 @@ namespace catapult { namespace chain {
 		context.orchestrator().poll(Timestamp(200));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(11, 1), context.orchestrator().votingStatus().Round);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(11, 1), false, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>(), context.messageFactory().messageTypes());
 		EXPECT_EQ(0u, context.messages().size());
@@ -340,9 +336,7 @@ namespace catapult { namespace chain {
 		context.orchestrator().poll(Timestamp(100));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(3, 4), context.orchestrator().votingStatus().Round);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(3, 4), false, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>(), context.messageFactory().messageTypes());
 		EXPECT_EQ(0u, context.messages().size());
@@ -364,9 +358,7 @@ namespace catapult { namespace chain {
 		context.orchestrator().poll(Timestamp(200));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(3, 4), context.orchestrator().votingStatus().Round);
-		EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(3, 4), true, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>({ MessageType::Prevote }), context.messageFactory().messageTypes());
 		EXPECT_EQ(1u, context.messages().size());
@@ -388,9 +380,7 @@ namespace catapult { namespace chain {
 		context.orchestrator().poll(Timestamp(200));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(3, 5), context.orchestrator().votingStatus().Round);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(3, 5), false, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>({ MessageType::Prevote, MessageType::Precommit }), context.messageFactory().messageTypes());
 		EXPECT_EQ(2u, context.messages().size());
@@ -408,9 +398,7 @@ namespace catapult { namespace chain {
 	namespace {
 		void AssertSinglePrevoteSent(const TestContext& context, const std::vector<Timestamp>& expectedStageAdvancerTimes) {
 			// Assert:
-			EXPECT_EQ(test::CreateFinalizationRound(3, 4), context.orchestrator().votingStatus().Round);
-			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrevote);
-			EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+			AssertVotingStatus({ test::CreateFinalizationRound(3, 4), true, false }, context.orchestrator().votingStatus());
 
 			EXPECT_EQ(std::vector<MessageType>({ MessageType::Prevote }), context.messageFactory().messageTypes());
 			ASSERT_EQ(1u, context.messages().size());
@@ -460,9 +448,7 @@ namespace catapult { namespace chain {
 	namespace {
 		void AssertSinglePrecommitSent(const TestContext& context, const Hash256& precommitHash) {
 			// Assert:
-			EXPECT_EQ(test::CreateFinalizationRound(3, 4), context.orchestrator().votingStatus().Round);
-			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrevote);
-			EXPECT_TRUE(context.orchestrator().votingStatus().HasSentPrecommit);
+			AssertVotingStatus({ test::CreateFinalizationRound(3, 4), true, true }, context.orchestrator().votingStatus());
 
 			EXPECT_EQ(std::vector<MessageType>({ MessageType::Prevote, MessageType::Precommit }), context.messageFactory().messageTypes());
 			ASSERT_EQ(2u, context.messages().size());
@@ -525,9 +511,7 @@ namespace catapult { namespace chain {
 		context.orchestrator().poll(Timestamp(100));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(3, 5), context.orchestrator().votingStatus().Round);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(3, 5), false, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>({ MessageType::Prevote, MessageType::Precommit }), context.messageFactory().messageTypes());
 		ASSERT_EQ(2u, context.messages().size());
@@ -551,9 +535,7 @@ namespace catapult { namespace chain {
 		context.orchestrator().poll(Timestamp(100));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(3, 5), context.orchestrator().votingStatus().Round);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(3, 5), false, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>({ MessageType::Precommit }), context.messageFactory().messageTypes());
 		ASSERT_EQ(1u, context.messages().size());
@@ -576,9 +558,7 @@ namespace catapult { namespace chain {
 		context.orchestrator().poll(Timestamp(100));
 
 		// Assert:
-		EXPECT_EQ(test::CreateFinalizationRound(3, 5), context.orchestrator().votingStatus().Round);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrevote);
-		EXPECT_FALSE(context.orchestrator().votingStatus().HasSentPrecommit);
+		AssertVotingStatus({ test::CreateFinalizationRound(3, 5), false, false }, context.orchestrator().votingStatus());
 
 		EXPECT_EQ(std::vector<MessageType>(), context.messageFactory().messageTypes());
 		ASSERT_EQ(0u, context.messages().size());

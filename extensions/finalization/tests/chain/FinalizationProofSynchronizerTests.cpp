@@ -127,7 +127,7 @@
 
 // 	namespace {
 // 		model::FinalizationStatistics CreateFinalizationStatistics(Height height) {
-// 			return { FinalizationEpoch(3), FinalizationPoint(12), height, Hash256() };
+// 			return { { FinalizationEpoch(3), FinalizationPoint(12) }, height, Hash256() };
 // 		}
 // 	}
 

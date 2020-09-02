@@ -279,7 +279,6 @@ namespace catapult { namespace chain {
 		});
 	}
 
-
 	TEST(TEST_CLASS, SetEpochHasNoEffectWhenCurrentEpochIsEqual) {
 		// Arrange:
 		RunSetEpochTest([](auto& context) {

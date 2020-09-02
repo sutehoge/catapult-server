@@ -34,7 +34,7 @@ namespace catapult { namespace finalization {
 
 	model::FinalizationContext FinalizationContextFactory::create(const model::FinalizationRound& round) const {
 		// TODO: calculate height from round.Epoch
-		auto votingSetHeight = Height(); // model::CalculateGroupedHeight<Height>(height, m_config.VotingSetGrouping);
+		auto votingSetHeight = Height(1); // model::CalculateGroupedHeight<Height>(height, m_config.VotingSetGrouping);
 		return model::FinalizationContext(
 				round.Point, // TODO: this can be epoch
 				votingSetHeight,

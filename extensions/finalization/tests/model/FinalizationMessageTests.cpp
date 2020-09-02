@@ -189,7 +189,7 @@ namespace catapult { namespace model {
 				auto otsTree = crypto::OtsTree::Create(
 						test::CopyKeyPair(keyPairDescriptor.VotingKeyPair),
 						storage,
-						{ context.config().OtsKeyDilution, { 0, 2 }, { 15, 1 } });
+						{ context.config().OtsKeyDilution, { 100, 2 }, { 160, 1 } });
 
 				// Act:
 				auto isEligibleVoter = IsEligibleVoter(otsTree, context);
@@ -225,7 +225,7 @@ namespace catapult { namespace model {
 				auto otsTree = crypto::OtsTree::Create(
 						test::CopyKeyPair(keyPairDescriptor.VotingKeyPair),
 						storage,
-						{ context.config().OtsKeyDilution, { 0, 2 }, { 15, 1 } });
+						{ context.config().OtsKeyDilution, { 100, 2 }, { 160, 1 } });
 
 				auto hashes = test::GenerateRandomHashes(numHashes);
 

@@ -160,16 +160,16 @@ namespace catapult { namespace finalization {
 			}
 
 		private:
-			static auto CreateOtsKeyIdentifier(FinalizationPoint point, model::FinalizationStage stage) {
-				return model::StepIdentifierToOtsKeyIdentifier({ FinalizationEpoch(), point, stage }, Ots_Key_Dilution);
+			static auto CreateOtsKeyIdentifier(FinalizationEpoch epoch, FinalizationPoint point, model::FinalizationStage stage) {
+				return model::StepIdentifierToOtsKeyIdentifier({ epoch, point, stage }, Ots_Key_Dilution);
 			}
 
 			static void SeedOtsTree(const config::UserConfiguration& userConfig) {
 				auto votingOtsTreeFilename = config::CatapultDataDirectory(userConfig.DataDirectory).rootDir().file("voting_ots_tree.dat");
 				io::FileStream otsStream(io::RawFile(votingOtsTreeFilename, io::OpenMode::Read_Write));
 
-				auto startKeyIdentifier = CreateOtsKeyIdentifier(FinalizationPoint(1), Prevote_Stage);
-				auto endKeyIdentifier = CreateOtsKeyIdentifier(FinalizationPoint(100), Precommit_Stage);
+				auto startKeyIdentifier = CreateOtsKeyIdentifier(FinalizationEpoch(1), FinalizationPoint(0), Prevote_Stage);
+				auto endKeyIdentifier = CreateOtsKeyIdentifier(FinalizationEpoch(1), FinalizationPoint(100), Precommit_Stage);
 				crypto::OtsTree::Create(test::GenerateKeyPair(), otsStream, { Ots_Key_Dilution, startKeyIdentifier, endKeyIdentifier });
 			}
 

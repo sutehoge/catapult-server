@@ -81,7 +81,7 @@ namespace catapult { namespace handlers {
 
 	namespace {
 		struct PullMessagesTraits {
-			static constexpr auto Data_Header_Size = sizeof(FinalizationPoint);
+			static constexpr auto Data_Header_Size = sizeof(model::FinalizationRound);
 			static constexpr auto Packet_Type = ionet::PacketType::Pull_Finalization_Messages;
 			static constexpr auto Valid_Request_Payload_Size = SizeOf32<utils::ShortHash>();
 

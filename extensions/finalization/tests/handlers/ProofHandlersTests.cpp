@@ -31,10 +31,16 @@ namespace catapult { namespace handlers {
 
 	// region FinalizationStatisticsHandler
 
+	namespace {
+		std::unique_ptr<mocks::MockProofStorage> CreateDefaultProofStorage(const Hash256& hash) {
+			return std::make_unique<mocks::MockProofStorage>(FinalizationEpoch(3), FinalizationPoint(8), Height(246), hash);
+		}
+	}
+
 	TEST(TEST_CLASS, FinalizationStatisticsHandler_DoesNotRespondToMalformedRequest) {
 		// Arrange:
 		auto hash = test::GenerateRandomByteArray<Hash256>();
-		auto proofStorage = io::ProofStorageCache(std::make_unique<mocks::MockProofStorage>(FinalizationPoint(8), Height(246), hash));
+		auto proofStorage = io::ProofStorageCache(CreateDefaultProofStorage(hash));
 
 		ionet::ServerPacketHandlers handlers;
 		RegisterFinalizationStatisticsHandler(handlers, proofStorage);
@@ -55,7 +61,7 @@ namespace catapult { namespace handlers {
 	TEST(TEST_CLASS, FinalizationStatisticsHandler_WritesFinalizationStatisticsResponseInResponseToValidRequest) {
 		// Arrange:
 		auto hash = test::GenerateRandomByteArray<Hash256>();
-		auto proofStorage = io::ProofStorageCache(std::make_unique<mocks::MockProofStorage>(FinalizationPoint(8), Height(246), hash));
+		auto proofStorage = io::ProofStorageCache(CreateDefaultProofStorage(hash));
 
 		ionet::ServerPacketHandlers handlers;
 		RegisterFinalizationStatisticsHandler(handlers, proofStorage);
@@ -73,9 +79,10 @@ namespace catapult { namespace handlers {
 
 		const auto* pResponse = test::GetSingleBufferData(handlerContext);
 		const auto* pResponse64 = reinterpret_cast<const uint64_t*>(pResponse);
-		EXPECT_EQ(8u, pResponse64[0]); // point
-		EXPECT_EQ(246u, pResponse64[1]); // height
-		EXPECT_EQ(hash, reinterpret_cast<const Hash256&>(*(pResponse + 2 * sizeof(uint64_t)))); // hash
+		EXPECT_EQ(3u, pResponse64[0]); // epoch
+		EXPECT_EQ(8u, pResponse64[1]); // point
+		EXPECT_EQ(246u, pResponse64[2]); // height
+		EXPECT_EQ(hash, reinterpret_cast<const Hash256&>(*(pResponse + 3 * sizeof(uint64_t)))); // hash
 	}
 
 	// endregion
@@ -94,7 +101,7 @@ namespace catapult { namespace handlers {
 
 		auto CreateProofStorageCacheWithProof(const std::shared_ptr<model::FinalizationProof>& pProof) {
 			auto hash = test::GenerateRandomByteArray<Hash256>();
-			auto pProofStorage = std::make_unique<mocks::MockProofStorage>(FinalizationPoint(8), Height(246), hash);
+			auto pProofStorage = CreateDefaultProofStorage(hash);
 			pProofStorage->setLastFinalizationProof(pProof);
 			return io::ProofStorageCache(std::move(pProofStorage));
 		}
@@ -104,7 +111,7 @@ namespace catapult { namespace handlers {
 
 			static auto CreatePacketWithIdentifier(int64_t delta) {
 				auto pPacket = ionet::CreateSharedPacket<api::ProofAtEpochRequest>();
-				pPacket->Epoch = FinalizationEpoch(static_cast<uint64_t>(8 + delta));
+				pPacket->Epoch = FinalizationEpoch(static_cast<uint64_t>(3 + delta));
 				return pPacket;
 			}
 

@@ -30,9 +30,11 @@
 namespace catapult { namespace tools { namespace votingkey {
 
 	namespace {
-		crypto::OtsKeyIdentifier ToOtsKeyIdentifier(FinalizationPoint point, uint16_t stage, uint64_t dilution) {
+		constexpr auto Temp_Max_Points_Per_Epoch = 256u;
+
+		crypto::OtsKeyIdentifier ToOtsKeyIdentifier(FinalizationEpoch epoch, FinalizationPoint point, uint16_t stage, uint64_t dilution) {
 			constexpr auto Num_Stages = 2u;
-			auto identifier = point.unwrap() * Num_Stages + stage;
+			auto identifier = epoch.unwrap() * Num_Stages * Temp_Max_Points_Per_Epoch + point.unwrap() * Num_Stages + stage;
 
 			crypto::OtsKeyIdentifier keyIdentifier;
 			keyIdentifier.BatchId = identifier / dilution;
@@ -53,12 +55,12 @@ namespace catapult { namespace tools { namespace votingkey {
 				optionsBuilder("dilution,d",
 						OptionsValue<uint16_t>(m_dilution)->default_value(128),
 						"ots key dilution (network setting)");
-				optionsBuilder("start,s",
-						OptionsValue<uint64_t>(m_startFinalizationPoint)->default_value(1),
-						"start finalization point");
-				optionsBuilder("end,e",
-						OptionsValue<uint64_t>(m_endFinalizationPoint)->default_value(26280),
-						"end finalization point");
+				optionsBuilder("startEpoch,s",
+						OptionsValue<uint64_t>(m_startFinalizationEpoch)->default_value(1),
+						"start finalization epoch");
+				optionsBuilder("endEpoch,e",
+						OptionsValue<uint64_t>(m_endFinalizationEpoch)->default_value(100),
+						"end finalization epoch");
 				optionsBuilder("secret,s",
 						OptionsValue<std::string>(m_secretKey),
 						"root secret key (testnet only, don't use in production)");
@@ -89,8 +91,16 @@ namespace catapult { namespace tools { namespace votingkey {
 				io::FileStream stream(io::RawFile(m_filename, io::OpenMode::Read_Write));
 				crypto::OtsOptions options;
 				options.Dilution = m_dilution;
-				options.StartKeyIdentifier = ToOtsKeyIdentifier(FinalizationPoint(m_startFinalizationPoint), 0, m_dilution);
-				options.EndKeyIdentifier = ToOtsKeyIdentifier(FinalizationPoint(m_endFinalizationPoint), 1, m_dilution);
+				options.StartKeyIdentifier = ToOtsKeyIdentifier(
+						FinalizationEpoch(m_startFinalizationEpoch),
+						FinalizationPoint(1),
+						0,
+						m_dilution);
+				options.EndKeyIdentifier = ToOtsKeyIdentifier(
+						FinalizationEpoch(m_endFinalizationEpoch),
+						FinalizationPoint(Dummy_Max_Points_Per_Epoch),
+						1,
+						m_dilution);
 
 				auto numBatches = (options.EndKeyIdentifier.BatchId - options.StartKeyIdentifier.BatchId + 1);
 				std::cout << "generating " << numBatches << " batch keys, this might take a while" << std::endl;
@@ -110,8 +120,8 @@ namespace catapult { namespace tools { namespace votingkey {
 		private:
 			std::string m_filename;
 			uint16_t m_dilution;
-			uint64_t m_startFinalizationPoint;
-			uint64_t m_endFinalizationPoint;
+			uint64_t m_startFinalizationEpoch;
+			uint64_t m_endFinalizationEpoch;
 			std::string m_secretKey;
 		};
 	}

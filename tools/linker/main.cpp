@@ -60,7 +60,7 @@ namespace catapult { namespace tools { namespace linker {
 						OptionsValue<uint64_t>()->default_value(1),
 						"voting key start epoch");
 				optionsBuilder("endEpoch,e",
-						OptionsValue<uint64_t>()->default_value(26280),
+						OptionsValue<uint64_t>()->default_value(100),
 						"voting key end epoch");
 				optionsBuilder("output",
 						OptionsValue<std::string>(),

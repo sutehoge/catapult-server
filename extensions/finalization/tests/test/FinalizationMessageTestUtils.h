@@ -22,6 +22,7 @@
 #include "finalization/src/model/FinalizationContext.h"
 #include "finalization/src/model/FinalizationMessage.h"
 #include "catapult/crypto/KeyPair.h"
+#include "catapult/model/FinalizationRound.h"
 #include <memory>
 
 namespace catapult {
@@ -31,7 +32,10 @@ namespace catapult {
 
 namespace catapult { namespace test {
 
-	// region step identifier factories
+	// region finalization round + step identifier factories
+
+	/// Creates a finalization round with the specified \a epoch and \a point.
+	model::FinalizationRound CreateFinalizationRound(uint64_t epoch, uint64_t point);
 
 	/// Creates a step identifier with the specified \a point.
 	model::StepIdentifier CreateStepIdentifierWithPoint(uint64_t point);

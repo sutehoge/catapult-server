@@ -59,7 +59,7 @@ namespace catapult { namespace chain {
 				std::unique_ptr<FinalizationMessageFactory>&& pMessageFactory);
 
 	public:
-		/// Gets the current voting status
+		/// Gets the current voting status.
 		VotingStatus votingStatus() const;
 
 	public:

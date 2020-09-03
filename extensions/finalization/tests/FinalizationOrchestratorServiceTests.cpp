@@ -341,7 +341,7 @@ namespace catapult { namespace finalization {
 	}
 
 	namespace {
-		void AssertCanRunFinalizationTaskWhenThereIsPendingBlockedFinalizedEpoch(uint32_t numBlocks) {
+		void AssertCanRunFinalizationTaskWhenThereIsPendingInconsistentFinalizedEpoch(uint32_t numBlocks) {
 			// Arrange:
 			TestContext context;
 			context.createCompletedRound();
@@ -354,7 +354,7 @@ namespace catapult { namespace finalization {
 					const auto& messages) {
 				const auto& expectedHash = context.hashes()[1];
 
-				// - check aggregator (it did not advance beyond the epoch)
+				// - check aggregator (it did not advance the epoch)
 				auto epoch = Finalization_Epoch.unwrap();
 				EXPECT_EQ(test::CreateFinalizationRound(epoch, 5), aggregator.view().minFinalizationRound());
 				EXPECT_EQ(test::CreateFinalizationRound(epoch, 8), aggregator.view().maxFinalizationRound());
@@ -387,13 +387,13 @@ namespace catapult { namespace finalization {
 		}
 	}
 
-	TEST(TEST_CLASS, CanRunFinalizationTaskWhenThereIsPendingBlockedFinalizedEpoch_InsufficientChainHeight) {
-		AssertCanRunFinalizationTaskWhenThereIsPendingBlockedFinalizedEpoch(170);
-		AssertCanRunFinalizationTaskWhenThereIsPendingBlockedFinalizedEpoch(244);
+	TEST(TEST_CLASS, CanRunFinalizationTaskWhenThereIsPendingInconsistentFinalizedEpoch_InsufficientChainHeight) {
+		AssertCanRunFinalizationTaskWhenThereIsPendingInconsistentFinalizedEpoch(170);
+		AssertCanRunFinalizationTaskWhenThereIsPendingInconsistentFinalizedEpoch(244);
 	}
 
-	TEST(TEST_CLASS, CanRunFinalizationTaskWhenThereIsPendingBlockedFinalizedEpoch_IncorrectHashInStorage) {
-		AssertCanRunFinalizationTaskWhenThereIsPendingBlockedFinalizedEpoch(245);
+	TEST(TEST_CLASS, CanRunFinalizationTaskWhenThereIsPendingInconsistentFinalizedEpoch_IncorrectHashInStorage) {
+		AssertCanRunFinalizationTaskWhenThereIsPendingInconsistentFinalizedEpoch(245);
 	}
 
 	TEST(TEST_CLASS, CanRunFinalizationTaskWhenThereIsPendingFinalizedEpoch) {
@@ -413,7 +413,7 @@ namespace catapult { namespace finalization {
 				const auto& messages) {
 			const auto& expectedHash = context.hashes()[1];
 
-			// - check aggregator
+			// - check aggregator (it advanced the epoch)
 			auto epoch = Finalization_Epoch.unwrap();
 			EXPECT_EQ(test::CreateFinalizationRound(epoch, 5), aggregator.view().minFinalizationRound());
 			EXPECT_EQ(test::CreateFinalizationRound(epoch + 1, 1), aggregator.view().maxFinalizationRound());

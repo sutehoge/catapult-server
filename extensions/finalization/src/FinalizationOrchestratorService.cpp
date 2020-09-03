@@ -41,7 +41,7 @@ namespace catapult { namespace finalization {
 
 		class BootstrapperFacade {
 		private:
-			enum class EpochStatus { Default, Blocked, Advance };
+			enum class EpochStatus { Continue, Wait, Advance };
 
 		private:
 			static constexpr auto LoadOtsTree = crypto::OtsTree::FromStream;
@@ -72,21 +72,21 @@ namespace catapult { namespace finalization {
 
 		public:
 			void poll(Timestamp time) {
-				auto orchestratorStartRound = m_orchestrator.votingStatus().Round;
+				auto orchestratorRound = m_orchestrator.votingStatus().Round;
 
-				auto epochStatus = calculateEpochStatus(orchestratorStartRound.Epoch);
-				if (EpochStatus::Blocked == epochStatus)
+				auto epochStatus = calculateEpochStatus(orchestratorRound.Epoch);
+				if (EpochStatus::Wait == epochStatus)
 					return;
 
 				if (EpochStatus::Advance == epochStatus) {
-					m_orchestrator.setEpoch(orchestratorStartRound.Epoch + FinalizationEpoch(1));
-					orchestratorStartRound = m_orchestrator.votingStatus().Round;
+					m_orchestrator.setEpoch(orchestratorRound.Epoch + FinalizationEpoch(1));
+					orchestratorRound = m_orchestrator.votingStatus().Round;
 
-					CATAPULT_LOG(debug) << "advancing to next epoch " << orchestratorStartRound;
+					CATAPULT_LOG(debug) << "advancing to next epoch " << orchestratorRound;
 				}
 
-				if (orchestratorStartRound > m_messageAggregator.view().maxFinalizationRound())
-					m_messageAggregator.modifier().setMaxFinalizationRound(orchestratorStartRound);
+				if (orchestratorRound > m_messageAggregator.view().maxFinalizationRound())
+					m_messageAggregator.modifier().setMaxFinalizationRound(orchestratorRound);
 
 				m_orchestrator.poll(time);
 				m_votingStatusFile.save(m_orchestrator.votingStatus());
@@ -99,7 +99,7 @@ namespace catapult { namespace finalization {
 				auto votingSetEndHeight = model::CalculateVotingSetEndHeight(epoch, m_votingSetGrouping);
 
 				if (finalizationStatistics.Height != votingSetEndHeight)
-					return EpochStatus::Default;
+					return EpochStatus::Continue;
 
 				auto blockStorageView = m_blockStorage.view();
 				auto localChainHeight = blockStorageView.chainHeight();
@@ -108,7 +108,7 @@ namespace catapult { namespace finalization {
 							<< "waiting for sync before transitioning from epoch " << epoch
 							<< " (height " << localChainHeight
 							<< " < finalized height " << finalizationStatistics.Height << ")";
-					return EpochStatus::Blocked;
+					return EpochStatus::Wait;
 				}
 
 				auto localBlockHash = *blockStorageView.loadHashesFrom(finalizationStatistics.Height, 1).cbegin();
@@ -117,7 +117,7 @@ namespace catapult { namespace finalization {
 							<< "waiting for sync before transitioning from epoch " << epoch
 							<< " (hash " << localBlockHash
 							<< " != finalized hash " << finalizationStatistics.Hash << ")";
-					return EpochStatus::Blocked;
+					return EpochStatus::Wait;
 				}
 
 				return EpochStatus::Advance;

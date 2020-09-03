@@ -32,19 +32,19 @@ namespace catapult { namespace model {
 		EXPECT_THROW(CalculateVotingSetStartHeight(FinalizationEpoch(1), 0), catapult_invalid_argument);
 	}
 
-	TEST(TEST_CLASS, CalculateVotingSetStartHeight_EpochZeroIsNotSupported) {
+	TEST(TEST_CLASS, CalculateVotingSetStartHeight_DoesNotSupportZeroEpoch) {
 		EXPECT_THROW(CalculateVotingSetStartHeight(FinalizationEpoch(), 20), catapult_invalid_argument);
 
 		EXPECT_THROW(CalculateVotingSetStartHeight(FinalizationEpoch(), 50), catapult_invalid_argument);
 	}
 
-	TEST(TEST_CLASS, CalculateVotingSetStartHeight_EpochOneIsSupported) {
+	TEST(TEST_CLASS, CalculateVotingSetStartHeight_SupportsEpochOne) {
 		EXPECT_EQ(Height(1), CalculateVotingSetStartHeight(FinalizationEpoch(1), 20));
 
 		EXPECT_EQ(Height(1), CalculateVotingSetStartHeight(FinalizationEpoch(1), 50));
 	}
 
-	TEST(TEST_CLASS, CalculateVotingSetStartHeight_EpochsGreaterThanOneAreSupported) {
+	TEST(TEST_CLASS, CalculateVotingSetStartHeight_SupportsEpochsGreaterThanOne) {
 		EXPECT_EQ(Height(2), CalculateVotingSetStartHeight(FinalizationEpoch(2), 20));
 		EXPECT_EQ(Height(21), CalculateVotingSetStartHeight(FinalizationEpoch(3), 20));
 		EXPECT_EQ(Height(141), CalculateVotingSetStartHeight(FinalizationEpoch(9), 20));
@@ -62,19 +62,19 @@ namespace catapult { namespace model {
 		EXPECT_THROW(CalculateVotingSetEndHeight(FinalizationEpoch(1), 0), catapult_invalid_argument);
 	}
 
-	TEST(TEST_CLASS, CalculateVotingSetEndHeight_EpochZeroIsNotSupported) {
+	TEST(TEST_CLASS, CalculateVotingSetEndHeight_DoesNotSupportZeroEpoch) {
 		EXPECT_THROW(CalculateVotingSetEndHeight(FinalizationEpoch(), 20), catapult_invalid_argument);
 
 		EXPECT_THROW(CalculateVotingSetEndHeight(FinalizationEpoch(), 50), catapult_invalid_argument);
 	}
 
-	TEST(TEST_CLASS, CalculateVotingSetEndHeight_EpochOneIsSupported) {
+	TEST(TEST_CLASS, CalculateVotingSetEndHeight_SupportsEpochOne) {
 		EXPECT_EQ(Height(1), CalculateVotingSetEndHeight(FinalizationEpoch(1), 20));
 
 		EXPECT_EQ(Height(1), CalculateVotingSetEndHeight(FinalizationEpoch(1), 50));
 	}
 
-	TEST(TEST_CLASS, CalculateVotingSetEndHeight_EpochsGreaterThanOneAreSupported) {
+	TEST(TEST_CLASS, CalculateVotingSetEndHeight_SupportsEpochsGreaterThanOne) {
 		EXPECT_EQ(Height(20), CalculateVotingSetEndHeight(FinalizationEpoch(2), 20));
 		EXPECT_EQ(Height(40), CalculateVotingSetEndHeight(FinalizationEpoch(3), 20));
 		EXPECT_EQ(Height(160), CalculateVotingSetEndHeight(FinalizationEpoch(9), 20));
@@ -101,7 +101,7 @@ namespace catapult { namespace model {
 		}
 	}
 
-	TEST(TEST_CLASS, VotingSetStartAndEndHeightsAreConsistentWithGrouping) {
+	TEST(TEST_CLASS, VotingSetStartAndEndHeightsAreConsistentWithGroupedHeight) {
 		// Arrange:
 		constexpr auto Grouping = 50u;
 		for (auto i = 2u; i <= 100; ++i) {
